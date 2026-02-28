@@ -1,7 +1,7 @@
 from textual.app import ComposeResult
 from textual.widgets import Static, Button, DataTable, Select, Label, Input
 from textual.containers import Horizontal, Vertical, ScrollableContainer
-from game.datacenter import buy_component, assemble_server, rent_rack, HARDWARE
+from game.datacenter import buy_component, rent_rack, HARDWARE
 
 
 def render_rack(rack, servers: list) -> str:

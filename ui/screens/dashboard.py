@@ -43,6 +43,17 @@ class DashboardPane(Static):
         monthly_pl = monthly_revenue - monthly_costs
         pl_color = "green" if monthly_pl >= 0 else "red"
 
+        snapshot_ticker = next((t for t, h in s.portfolio.items() if h.get("shares", 0) > 0), None)
+        if not snapshot_ticker:
+            snapshot_ticker = next(iter(s.price_history), None)
+        if snapshot_ticker:
+            hist = s.price_history.get(snapshot_ticker, [])
+            chart = sparkline(hist, width=20)
+            price = s.market_prices.get(snapshot_ticker, 0)
+            snapshot_section = f"\n[bold cyan]── MARKET SNAPSHOT ──[/]\n\n  {snapshot_ticker}: {chart} ${price:.2f}\n"
+        else:
+            snapshot_section = ""
+
         content = f"""[bold cyan]── FINANCIAL SUMMARY ──[/]
 
   Net Worth:       [yellow]${net_worth:>12,.2f}[/]
@@ -50,7 +61,7 @@ class DashboardPane(Static):
   Savings:         [green]${s.savings:>12,.2f}[/]
   Investments:     [yellow]${port_val + bond_val:>12,.2f}[/]
   Total Debt:      [red]${loan_debt:>12,.2f}[/]
-
+{snapshot_section}
 [bold cyan]── BUSINESS OVERVIEW ──[/]
 
   Monthly Revenue: [green]${monthly_revenue:>10,.2f}[/]

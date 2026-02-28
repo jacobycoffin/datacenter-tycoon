@@ -41,48 +41,57 @@ class MainScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        self._update_header()
+        self.query_one("#game-header", Static).update(self._update_header())
 
-    def _update_header(self) -> None:
+    def _update_header(self) -> str:
         s = self.app.state
         from game.market import portfolio_value
         net = s.cash + s.savings + portfolio_value(s.portfolio, s.market_prices)
-        header_text = (
+        return (
             f"[bold cyan]{s.company_name}[/]  │  "
             f"Day {s.day}  │  "
             f"Cash: [green]${s.cash:,.2f}[/]  │  "
             f"Net Worth: [yellow]${net:,.2f}[/]  │  "
             f"Rep: {s.reputation}"
         )
-        self.query_one("#game-header", Static).update(header_text)
 
     def refresh_ui(self) -> None:
-        self._update_header()
+        """Called after state change to update all panes."""
+        self.query_one("#game-header", Static).update(self._update_header())
         log = self.query_one("#event-log", RichLog)
         log.clear()
         for entry in self.app.state.event_log[-3:]:
             log.write(entry)
+        # Refresh active tab pane
         tabs = self.query_one("#main-tabs", TabbedContent)
         active = tabs.active
-        pane_map = {
-            "tab-dashboard": "DashboardPane",
-            "tab-datacenter": "DatacenterPane",
-            "tab-market": "MarketPane",
-            "tab-banking": "BankingPane",
-            "tab-contracts": "ContractsPane",
-        }
-        if active in pane_map:
+        if active == "tab-dashboard":
             try:
-                pane_class_name = pane_map[active]
-                for widget in self.query("*"):
-                    if type(widget).__name__ == pane_class_name:
-                        if hasattr(widget, "refresh_content"):
-                            widget.refresh_content()
-                        elif hasattr(widget, "_refresh"):
-                            widget._refresh()
-                        break
-            except Exception:
-                pass
+                self.query_one("DashboardPane").refresh_content()
+            except Exception as e:
+                self.log.error(f"Dashboard refresh failed: {e}")
+        elif active == "tab-market":
+            try:
+                pane = self.query_one("MarketPane")
+                pane._build_table()
+                pane._refresh_portfolio()
+            except Exception as e:
+                self.log.error(f"Market refresh failed: {e}")
+        elif active == "tab-contracts":
+            try:
+                self.query_one("ContractsPane")._refresh()
+            except Exception as e:
+                self.log.error(f"Contracts refresh failed: {e}")
+        elif active == "tab-banking":
+            try:
+                self.query_one("BankingPane")._refresh()
+            except Exception as e:
+                self.log.error(f"Banking refresh failed: {e}")
+        elif active == "tab-datacenter":
+            try:
+                self.query_one("DatacenterPane")._refresh()
+            except Exception as e:
+                self.log.error(f"Datacenter refresh failed: {e}")
 
     def action_advance_day(self) -> None:
         from game.engine import advance_day

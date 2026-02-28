@@ -64,22 +64,27 @@ class BankingPane(Static):
         if not s.loans:
             lines.append("  No active loans")
         for loan in s.loans:
-            l = loan if isinstance(loan, dict) else vars(loan)
-            lines.append(f"  ${l.get('remaining_balance',0):,.2f} remaining  |  ${l.get('monthly_payment',0):,.2f}/mo  |  {l.get('days_remaining',0)}d left")
+            remaining_balance = loan["remaining_balance"] if isinstance(loan, dict) else loan.remaining_balance
+            monthly_payment = loan["monthly_payment"] if isinstance(loan, dict) else loan.monthly_payment
+            days_remaining = loan["days_remaining"] if isinstance(loan, dict) else loan.days_remaining
+            lines.append(f"  ${remaining_balance:,.2f} remaining  |  ${monthly_payment:,.2f}/mo  |  {days_remaining}d left")
 
         lines += ["", "[bold cyan]── BONDS ──[/]"]
         if not s.bonds:
             lines.append("  No bonds held")
         for bond in s.bonds:
-            b = bond if isinstance(bond, dict) else vars(bond)
-            lines.append(f"  ${b.get('face_value',0):,.2f} face  |  {b.get('annual_yield',0)*100:.0f}%/yr  |  {b.get('days_remaining',0)}d to maturity")
+            face_value = bond["face_value"] if isinstance(bond, dict) else bond.face_value
+            annual_yield = bond["annual_yield"] if isinstance(bond, dict) else bond.annual_yield
+            days_remaining = bond["days_remaining"] if isinstance(bond, dict) else bond.days_remaining
+            lines.append(f"  ${face_value:,.2f} face  |  {annual_yield*100:.0f}%/yr  |  {days_remaining}d to maturity")
 
         lines += ["", "[bold cyan]── CDs ──[/]"]
         if not s.cds:
             lines.append("  No CDs")
         for cd in s.cds:
-            c = cd if isinstance(cd, dict) else vars(cd)
-            lines.append(f"  ${c.get('balance',0):,.2f}  |  15%/yr  |  {c.get('days_remaining',0)}d remaining")
+            balance = cd["balance"] if isinstance(cd, dict) else cd.balance
+            days_remaining = cd["days_remaining"] if isinstance(cd, dict) else cd.days_remaining
+            lines.append(f"  ${balance:,.2f}  |  15%/yr  |  {days_remaining}d remaining")
 
         self.query_one("#banking-content", Static).update("\n".join(lines))
 
