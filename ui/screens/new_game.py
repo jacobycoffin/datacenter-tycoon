@@ -1,6 +1,6 @@
 from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.widgets import Button, Input, Label, Static
+from textual.widgets import Button, Input, Label, RadioButton, RadioSet, Static
 from textual.containers import Center, Vertical
 
 LOGO = r"""
@@ -26,13 +26,14 @@ class NewGameScreen(Screen):
                 Label("Company Name:"),
                 Input(placeholder="e.g. Apex Data Solutions", id="company-name"),
                 Label("Difficulty:"),
-                Label("  [E] Easy — $75,000 starting cash", id="diff-easy"),
-                Label("  [N] Normal — $50,000 starting cash (recommended)", id="diff-normal"),
-                Label("  [H] Hard — $25,000 starting cash", id="diff-hard"),
-                Button("Start — Normal ($50,000)", id="btn-normal", variant="success"),
-                Button("Start — Easy ($75,000)", id="btn-easy", variant="default"),
-                Button("Start — Hard ($25,000)", id="btn-hard", variant="error"),
-                Button("Load Existing Game", id="btn-load", variant="primary"),
+                RadioSet(
+                    RadioButton("Easy — $75,000 starting cash", id="easy"),
+                    RadioButton("Normal — $50,000 starting cash", id="normal", value=True),
+                    RadioButton("Hard — $25,000 starting cash", id="hard"),
+                    id="difficulty-radio",
+                ),
+                Button("Start Game", id="start", variant="success"),
+                Button("Load Game", id="load", variant="default"),
             )
         )
 
@@ -44,19 +45,15 @@ class NewGameScreen(Screen):
         name_input = self.query_one("#company-name", Input).value.strip()
         name = name_input or "My Data Center"
 
-        difficulty_map = {
-            "btn-normal": "normal",
-            "btn-easy": "easy",
-            "btn-hard": "hard",
-        }
-
-        if event.button.id in difficulty_map:
-            difficulty = difficulty_map[event.button.id]
+        if event.button.id == "start":
+            radio_set = self.query_one("#difficulty-radio", RadioSet)
+            pressed = radio_set.pressed_button
+            difficulty = pressed.id if pressed else "normal"
             state = initialize_new_game(name, difficulty)
             self.app.state = state
             self.app.switch_screen(MainScreen())
 
-        elif event.button.id == "btn-load":
+        elif event.button.id == "load":
             if not name_input:
                 self.notify("Enter your company name to load a save.", severity="warning")
                 return

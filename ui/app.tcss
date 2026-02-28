@@ -27,3 +27,8 @@ Footer {
 .sla-green  { color: #3fb950; }
 .sla-yellow { color: #e3b341; }
 .sla-red    { color: #f85149; }
+
+.panel-title {
+    color: #58a6ff;
+    text-style: bold;
+}

@@ -28,7 +28,7 @@ class MarketPane(Static):
         s = self.app.state
         table = self.query_one("#stock-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("Ticker", "Company", "Price", "Change", "Chart", "Owned")
+        table.add_columns("Ticker", "Company", "Sector", "Price", "Change", "Chart", "Owned")
         for co in COMPANIES:
             ticker = co["ticker"]
             price = s.market_prices.get(ticker, co["base_price"])
@@ -40,7 +40,7 @@ class MarketPane(Static):
             chart = sparkline(hist, width=12)
             holding = s.portfolio.get(ticker, {})
             owned = holding.get("shares", 0) if isinstance(holding, dict) else 0
-            table.add_row(ticker, co["name"], f"${price:.2f}", chg_str, chart, str(owned), key=ticker)
+            table.add_row(ticker, co["name"], co["sector"], f"${price:.2f}", chg_str, chart, str(owned), key=ticker)
 
     def _refresh_portfolio(self) -> None:
         from game.market import portfolio_value

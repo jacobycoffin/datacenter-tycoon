@@ -10,6 +10,7 @@ class DatacenterApp(App):
     BINDINGS = [
         Binding("ctrl+q", "quit_and_save", "Save & Quit"),
         Binding("s", "save_game_action", "Save"),
+        Binding("?", "goto_glossary", "Glossary"),
     ]
 
     def __init__(self):
@@ -29,3 +30,11 @@ class DatacenterApp(App):
         if self.state:
             save_game(self.state)
             self.notify("Game saved!", timeout=2)
+
+    def action_goto_glossary(self) -> None:
+        from textual.widgets import TabbedContent
+        try:
+            tabs = self.query_one("#main-tabs", TabbedContent)
+            tabs.active = "tab-glossary"
+        except Exception:
+            pass

@@ -81,6 +81,39 @@ class DatacenterPane(Static):
                 inv_lines.append(f"  [{c.get('type','').upper()}] {c.get('name','')} (${c.get('price',0):,.2f})")
             else:
                 inv_lines.append(f"  [{c.type.upper()}] {c.name} (${c.price:,.2f})")
+        # Assembled servers section
+        assembled = []
+        for srv in s.servers:
+            if isinstance(srv, dict):
+                rack_id = srv.get("rack_id")
+                srv_name = srv.get("name", "")
+                cores = srv.get("total_cores", 0)
+                ram = srv.get("total_ram_gb", 0)
+                storage = srv.get("total_storage_gb", 0)
+                health = srv.get("health", 1.0)
+            else:
+                rack_id = srv.rack_id
+                srv_name = srv.name
+                cores = srv.total_cores
+                ram = srv.total_ram_gb
+                storage = srv.total_storage_gb
+                health = srv.health
+            if rack_id is None:
+                rack_info = "Unracked"
+            else:
+                rack_info = f"Rack: {rack_id}"
+            assembled.append(
+                f"  {srv_name} – {cores}c / {ram}GB RAM / {storage}GB – "
+                f"Health: {health*100:.0f}%  {rack_info}"
+            )
+
+        inv_lines.append("")
+        inv_lines.append("── ASSEMBLED SERVERS ──")
+        if assembled:
+            inv_lines.extend(assembled)
+        else:
+            inv_lines.append("  No assembled servers.")
+
         self.query_one("#inv-content", Static).update(
             "\n".join(inv_lines) if inv_lines else "  [dim]No components in inventory[/]"
         )
