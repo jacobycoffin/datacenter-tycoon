@@ -92,3 +92,28 @@ def test_contract_days_remaining_decremented():
     state.active_contracts.append(contract)
     state = advance_day(state)
     assert state.active_contracts[0].days_remaining == 59
+
+
+@pytest.fixture
+def sample_state():
+    return initialize_new_game("SampleCorp", "normal")
+
+
+def test_accept_gig_pays_and_removes(sample_state):
+    from game.engine import accept_gig, initialize_new_game
+    state = initialize_new_game("GigCorp", "normal")
+    assert len(state.available_gigs) > 0
+    gig = state.available_gigs[0]
+    payout = gig.payout if hasattr(gig, "payout") else gig["payout"]
+    old_cash = state.cash
+    old_count = len(state.available_gigs)
+    state = accept_gig(state, 0)
+    assert state.cash == pytest.approx(old_cash + payout)
+    assert len(state.available_gigs) == old_count - 1
+
+
+def test_accept_gig_out_of_range_raises(sample_state):
+    from game.engine import accept_gig, initialize_new_game
+    state = initialize_new_game("GigCorp", "normal")
+    with pytest.raises(ValueError, match="No gig"):
+        accept_gig(state, 99)

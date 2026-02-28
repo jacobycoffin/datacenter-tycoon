@@ -42,6 +42,20 @@ def _log(state: GameState, msg: str) -> None:
     state.event_log = state.event_log[-50:]
 
 
+def accept_gig(state: GameState, gig_index: int) -> GameState:
+    """Collect a gig by index (0-based) — instant payout, removes from board."""
+    if gig_index < 0 or gig_index >= len(state.available_gigs):
+        raise ValueError(f"No gig at position {gig_index + 1}")
+    gig = state.available_gigs[gig_index]
+    payout = _get(gig, "payout", 0.0)
+    title = _get(gig, "title", "Unknown gig")
+    state.cash += payout
+    state.total_revenue += payout
+    state.available_gigs.pop(gig_index)
+    _log(state, f"Gig completed: {title} +${payout:,.2f}")
+    return state
+
+
 def advance_day(state: GameState) -> GameState:
     state.day += 1
 
