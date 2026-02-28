@@ -458,9 +458,114 @@ class MainScreen(Screen):
         except ValueError as e:
             return False, str(e)
 
-    # ── Placeholder stubs (Task 8 pending) ────────────────────────
-    def _cmd_buyhw(self, args):    return False, "Not yet implemented"
-    def _cmd_assemble(self, args): return False, "Not yet implemented"
-    def _cmd_install(self, args):  return False, "Not yet implemented"
-    def _cmd_repair(self, args):   return False, "Not yet implemented"
-    def _cmd_rent(self, args):     return False, "Not yet implemented"
+    # ── Task 8: Datacenter commands ────────────────────────────────
+    def _cmd_buyhw(self, args):
+        # buyhw <hw_id>
+        from game.datacenter import buy_component
+        if len(args) != 1:
+            return False, "Usage: buyhw <hw_id>  (see hw_id column in Datacenter tab)"
+        try:
+            self.app.state = buy_component(self.app.state, args[0])
+            return True, f"Purchased {args[0]}. Check Datacenter inventory."
+        except ValueError as e:
+            return False, str(e)
+
+    def _cmd_assemble(self, args):
+        # assemble <name> <hw_id...>
+        # Component types identified by id prefix: cpu_ / ram_ / hdd_ ssd_ / nic_
+        from game.datacenter import assemble_server, _find_hardware
+        if len(args) < 5:
+            return False, "Usage: assemble <name> <cpu_id> <ram_id> <storage_id> <nic_id>  (more ram/storage ok)"
+        name = args[0]
+        hw_ids = args[1:]
+        cpu_ids, ram_ids, stor_ids, nic_ids = [], [], [], []
+        for hw_id in hw_ids:
+            if hw_id.startswith("cpu_"):
+                cpu_ids.append(hw_id)
+            elif hw_id.startswith("ram_"):
+                ram_ids.append(hw_id)
+            elif hw_id.startswith("hdd_") or hw_id.startswith("ssd_"):
+                stor_ids.append(hw_id)
+            elif hw_id.startswith("nic_"):
+                nic_ids.append(hw_id)
+            else:
+                return False, f"Unknown component type for '{hw_id}'. IDs must start with cpu_/ram_/hdd_/ssd_/nic_"
+        if len(cpu_ids) != 1:
+            return False, "Need exactly 1 CPU (cpu_budget / cpu_mid / cpu_pro / cpu_enterprise)"
+        if not ram_ids:
+            return False, "Need at least 1 RAM stick"
+        if not stor_ids:
+            return False, "Need at least 1 storage drive"
+        if len(nic_ids) != 1:
+            return False, "Need exactly 1 NIC (nic_1g / nic_10g)"
+        s = self.app.state
+        used = set()
+        def claim(hw_id):
+            hw = _find_hardware(hw_id)
+            for c in s.hardware_inventory:
+                c_name = c.get("name") if isinstance(c, dict) else c.name
+                c_id = c.get("id") if isinstance(c, dict) else c.id
+                if c_name == hw["name"] and c_id not in used:
+                    used.add(c_id)
+                    return c_id
+            return None
+        cpu_inst = claim(cpu_ids[0])
+        ram_insts = [claim(r) for r in ram_ids]
+        stor_insts = [claim(r) for r in stor_ids]
+        nic_inst = claim(nic_ids[0])
+        missing = []
+        if cpu_inst is None: missing.append(cpu_ids[0])
+        for i, r in enumerate(ram_insts):
+            if r is None: missing.append(ram_ids[i])
+        for i, r in enumerate(stor_insts):
+            if r is None: missing.append(stor_ids[i])
+        if nic_inst is None: missing.append(nic_ids[0])
+        if missing:
+            return False, f"Not in inventory: {', '.join(missing)}"
+        try:
+            self.app.state, server = assemble_server(s, name, cpu_inst, ram_insts, stor_insts, nic_inst)
+            cores = server.total_cores if hasattr(server, "total_cores") else server.get("total_cores", 0)
+            ram = server.total_ram_gb if hasattr(server, "total_ram_gb") else server.get("total_ram_gb", 0)
+            stor = server.total_storage_gb if hasattr(server, "total_storage_gb") else server.get("total_storage_gb", 0)
+            return True, f"Built '{name}': {cores} cores / {ram}GB RAM / {stor}GB storage. Install with: install {name} <rack_n>"
+        except ValueError as e:
+            return False, str(e)
+
+    def _cmd_install(self, args):
+        # install <server_name> <rack_n>
+        from game.datacenter import install_server_in_rack
+        if len(args) < 2:
+            return False, "Usage: install <server_name> <rack_n>"
+        try:
+            rack_n = int(args[-1]) - 1
+        except ValueError:
+            return False, "Usage: install <server_name> <rack_n>  (rack_n is a number)"
+        server_name = " ".join(args[:-1])
+        try:
+            self.app.state = install_server_in_rack(self.app.state, server_name, rack_n)
+            return True, f"Installed '{server_name}' in Rack {rack_n+1}."
+        except ValueError as e:
+            return False, str(e)
+
+    def _cmd_repair(self, args):
+        # repair <server_name>
+        from game.datacenter import repair_server
+        if not args:
+            return False, "Usage: repair <server_name>"
+        server_name = " ".join(args)
+        try:
+            self.app.state = repair_server(self.app.state, server_name)
+            return True, f"Repaired '{server_name}' to 100% health. (-$500)"
+        except ValueError as e:
+            return False, str(e)
+
+    def _cmd_rent(self, args):
+        # rent
+        from game.datacenter import rent_rack
+        try:
+            self.app.state = rent_rack(self.app.state)
+            rack = self.app.state.racks[-1]
+            rent = rack.monthly_rent if hasattr(rack, "monthly_rent") else rack.get("monthly_rent", 800)
+            return True, f"Rented a new rack (${rent:,.0f}/mo). You now have {len(self.app.state.racks)} racks."
+        except ValueError as e:
+            return False, str(e)
