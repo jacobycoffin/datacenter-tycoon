@@ -93,6 +93,37 @@ class MainScreen(Screen):
             except Exception as e:
                 self.log.error(f"Datacenter refresh failed: {e}")
 
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        """Refresh the newly activated tab's pane."""
+        active = self.query_one("#main-tabs", TabbedContent).active
+        if active == "tab-dashboard":
+            try:
+                self.query_one("DashboardPane").refresh_content()
+            except Exception as e:
+                self.log.error(f"Dashboard tab refresh failed: {e}")
+        elif active == "tab-market":
+            try:
+                pane = self.query_one("MarketPane")
+                pane._build_table()
+                pane._refresh_portfolio()
+            except Exception as e:
+                self.log.error(f"Market tab refresh failed: {e}")
+        elif active == "tab-contracts":
+            try:
+                self.query_one("ContractsPane")._refresh()
+            except Exception as e:
+                self.log.error(f"Contracts tab refresh failed: {e}")
+        elif active == "tab-banking":
+            try:
+                self.query_one("BankingPane")._refresh()
+            except Exception as e:
+                self.log.error(f"Banking tab refresh failed: {e}")
+        elif active == "tab-datacenter":
+            try:
+                self.query_one("DatacenterPane")._refresh()
+            except Exception as e:
+                self.log.error(f"Datacenter tab refresh failed: {e}")
+
     def action_advance_day(self) -> None:
         from game.engine import advance_day
         from game.save import save_game
