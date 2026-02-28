@@ -38,14 +38,14 @@ class GlossaryPane(Static):
         yield ScrollableContainer(Static("", id="glossary-content"), id="glossary-scroll")
 
     def on_mount(self) -> None:
-        self._render(GLOSSARY)
+        self._render_terms(GLOSSARY)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         query = event.value.lower()
         filtered = {k: v for k, v in GLOSSARY.items() if query in k.lower() or query in v.lower()}
-        self._render(filtered)
+        self._render_terms(filtered)
 
-    def _render(self, terms: dict) -> None:
+    def _render_terms(self, terms: dict) -> None:
         lines = []
         for term, definition in sorted(terms.items()):
             lines.append(f"[bold yellow]{term}[/]")
