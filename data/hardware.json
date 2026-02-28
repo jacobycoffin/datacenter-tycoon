@@ -1,0 +1,24 @@
+{
+  "cpu": [
+    {"id": "cpu_budget",     "name": "Budget Quad-Core",     "specs": {"cores": 4,  "speed": "2.8GHz"}, "price": 150},
+    {"id": "cpu_mid",        "name": "Octa-Core Workbench",  "specs": {"cores": 8,  "speed": "3.2GHz"}, "price": 400},
+    {"id": "cpu_pro",        "name": "16-Core Pro",          "specs": {"cores": 16, "speed": "3.8GHz"}, "price": 950},
+    {"id": "cpu_enterprise", "name": "64-Core Enterprise",   "specs": {"cores": 64, "speed": "4.2GHz"}, "price": 2500}
+  ],
+  "ram": [
+    {"id": "ram_8gb",   "name": "8GB DDR4 Stick",   "specs": {"gb": 8},   "price": 40},
+    {"id": "ram_32gb",  "name": "32GB DDR4 Stick",  "specs": {"gb": 32},  "price": 120},
+    {"id": "ram_128gb", "name": "128GB DDR5 Stick",  "specs": {"gb": 128}, "price": 380},
+    {"id": "ram_256gb", "name": "256GB DDR5 Stick",  "specs": {"gb": 256}, "price": 600}
+  ],
+  "storage": [
+    {"id": "hdd_500gb", "name": "500GB HDD",       "specs": {"gb": 500},  "price": 60},
+    {"id": "hdd_4tb",   "name": "4TB HDD",         "specs": {"gb": 4096}, "price": 180},
+    {"id": "ssd_1tb",   "name": "1TB NVMe SSD",    "specs": {"gb": 1000}, "price": 350},
+    {"id": "ssd_8tb",   "name": "8TB NVMe SSD",    "specs": {"gb": 8000}, "price": 800}
+  ],
+  "nic": [
+    {"id": "nic_1g",  "name": "1Gbps NIC",  "specs": {"gbps": 1},  "price": 30},
+    {"id": "nic_10g", "name": "10Gbps NIC", "specs": {"gbps": 10}, "price": 200}
+  ]
+}
