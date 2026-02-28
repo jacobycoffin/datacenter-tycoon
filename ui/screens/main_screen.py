@@ -354,12 +354,111 @@ class MainScreen(Screen):
         sign = "+" if diff >= 0 else ""
         return True, f"Sold bond for ${value:,.2f} (face ${fv:,.2f}, {sign}${diff:,.2f})"
 
-    # ── Placeholder stubs (Tasks 7-8 pending) ─────────────────────
-    def _cmd_accept(self, args):   return False, "Not yet implemented"
-    def _cmd_decline(self, args):  return False, "Not yet implemented"
-    def _cmd_negotiate(self, args):return False, "Not yet implemented"
-    def _cmd_assign(self, args):   return False, "Not yet implemented"
-    def _cmd_gig(self, args):      return False, "Not yet implemented"
+    # ── Task 7: Contract commands ──────────────────────────────────
+    def _cmd_accept(self, args):
+        # accept <n>
+        if len(args) != 1:
+            return False, "Usage: accept <n>"
+        try:
+            idx = int(args[0]) - 1
+        except ValueError:
+            return False, "Usage: accept <n>"
+        s = self.app.state
+        if idx < 0 or idx >= len(s.pending_contracts):
+            return False, f"No offer #{idx+1}"
+        contract = s.pending_contracts[idx]
+        if isinstance(contract, dict):
+            contract["status"] = "active"
+        else:
+            contract.status = "active"
+        s.active_contracts.append(contract)
+        s.pending_contracts.pop(idx)
+        client = contract.get("client_name", "?") if isinstance(contract, dict) else contract.client_name
+        return True, f"Contract accepted from {client}! Assign a server with: assign <n> <server>"
+
+    def _cmd_decline(self, args):
+        # decline <n>
+        if len(args) != 1:
+            return False, "Usage: decline <n>"
+        try:
+            idx = int(args[0]) - 1
+        except ValueError:
+            return False, "Usage: decline <n>"
+        s = self.app.state
+        if idx < 0 or idx >= len(s.pending_contracts):
+            return False, f"No offer #{idx+1}"
+        contract = s.pending_contracts.pop(idx)
+        client = contract.get("client_name", "?") if isinstance(contract, dict) else contract.client_name
+        return True, f"Declined offer from {client}."
+
+    def _cmd_negotiate(self, args):
+        # negotiate <n>
+        from game.contracts import negotiate_contract
+        from game.models import Contract as ContractModel
+        if len(args) != 1:
+            return False, "Usage: negotiate <n>"
+        try:
+            idx = int(args[0]) - 1
+        except ValueError:
+            return False, "Usage: negotiate <n>"
+        s = self.app.state
+        if idx < 0 or idx >= len(s.pending_contracts):
+            return False, f"No offer #{idx+1}"
+        contract = s.pending_contracts[idx]
+        c_obj = ContractModel(**contract) if isinstance(contract, dict) else contract
+        new_contract = negotiate_contract(c_obj, counter_pct=0.15)
+        s.pending_contracts.pop(idx)
+        if new_contract:
+            new_contract.status = "active"
+            s.active_contracts.append(new_contract)
+            return True, f"Negotiated! New rate: ${new_contract.monthly_revenue:,.2f}/mo"
+        return False, "Counter-offer rejected."
+
+    def _cmd_assign(self, args):
+        # assign <n> <server_name>
+        if len(args) < 2:
+            return False, "Usage: assign <contract_n> <server_name>"
+        try:
+            idx = int(args[0]) - 1
+        except ValueError:
+            return False, "Usage: assign <contract_n> <server_name>"
+        server_name = " ".join(args[1:])
+        s = self.app.state
+        if idx < 0 or idx >= len(s.active_contracts):
+            return False, f"No active contract #{idx+1}"
+        contract = s.active_contracts[idx]
+        server = next(
+            (sv for sv in s.servers
+             if (sv.get("name","") if isinstance(sv,dict) else sv.name).lower() == server_name.lower()),
+            None
+        )
+        if server is None:
+            return False, f"No server named '{server_name}'"
+        srv_id = server.get("id") if isinstance(server,dict) else server.id
+        ctr_id = contract.get("id") if isinstance(contract,dict) else contract.id
+        if isinstance(contract, dict): contract["server_id"] = srv_id
+        else: contract.server_id = srv_id
+        if isinstance(server, dict): server["contract_id"] = ctr_id
+        else: server.contract_id = ctr_id
+        cname = contract.get("client_name","?") if isinstance(contract,dict) else contract.client_name
+        return True, f"Assigned {server_name} to {cname}'s contract."
+
+    def _cmd_gig(self, args):
+        # gig <n>
+        from game.engine import accept_gig
+        if len(args) != 1:
+            return False, "Usage: gig <n>"
+        try:
+            idx = int(args[0]) - 1
+        except ValueError:
+            return False, "Usage: gig <n>"
+        try:
+            self.app.state = accept_gig(self.app.state, idx)
+            return True, f"Gig completed! Check event log for payout."
+        except ValueError as e:
+            return False, str(e)
+
+    # ── Placeholder stubs (Task 8 pending) ────────────────────────
     def _cmd_buyhw(self, args):    return False, "Not yet implemented"
     def _cmd_assemble(self, args): return False, "Not yet implemented"
     def _cmd_install(self, args):  return False, "Not yet implemented"
