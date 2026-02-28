@@ -42,7 +42,7 @@ def test_company_name_with_special_chars_saves_safely(tmp_path):
     state = GameState(company_name="My/Fancy Corp!", difficulty="normal")
     save_game(state, save_dir=str(tmp_path))
     # File should exist with sanitized name
-    expected = tmp_path / "My_Fancy_Corp_"
+    assert (tmp_path / "My_Fancy_Corp.json").exists()
     # Load should work using same sanitization
     loaded = load_game("My/Fancy Corp!", save_dir=str(tmp_path))
     assert loaded is not None
