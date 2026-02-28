@@ -8,6 +8,13 @@ from game.datacenter import (
 from game.models import GameState, Rack
 
 
+@pytest.fixture
+def sample_state():
+    state = GameState(company_name="Test", difficulty="normal", cash=10000.0)
+    state.racks = [Rack(id="rack1", name="Rack A")]
+    return state
+
+
 def make_state():
     state = GameState(company_name="Test", difficulty="normal", cash=10000.0)
     state.racks = [Rack(id="rack1", name="Rack A")]
@@ -97,3 +104,96 @@ def test_rent_rack_max_10():
     state.racks = [Rack(id=f"r{i}", name=f"Rack {i}") for i in range(10)]
     with pytest.raises(ValueError, match="Maximum 10 racks"):
         rent_rack(state)
+
+
+def test_get_component_works_with_dict_inventory(tmp_path):
+    """After save/load, inventory items are dicts — assemble must still work."""
+    from game.save import save_game, load_game
+    from game.datacenter import buy_component, assemble_server
+    from game.models import GameState
+    state = GameState(company_name="Test", difficulty="normal", cash=10000.0)
+    state = buy_component(state, "cpu_budget")
+    state = buy_component(state, "ram_8gb")
+    state = buy_component(state, "hdd_500gb")
+    state = buy_component(state, "nic_1g")
+    save_game(state, save_dir=str(tmp_path))
+    loaded = load_game("Test", save_dir=str(tmp_path))
+    # All items are now dicts
+    assert isinstance(loaded.hardware_inventory[0], dict)
+    cpu_id = loaded.hardware_inventory[0]["id"]
+    ram_id = loaded.hardware_inventory[1]["id"]
+    stor_id = loaded.hardware_inventory[2]["id"]
+    nic_id = loaded.hardware_inventory[3]["id"]
+    loaded, server = assemble_server(loaded, "TestBox", cpu_id, [ram_id], [stor_id], nic_id)
+    assert len(loaded.servers) == 1
+    assert len(loaded.hardware_inventory) == 0
+
+
+def test_install_server_in_rack(sample_state):
+    from game.datacenter import buy_component, assemble_server, install_server_in_rack
+    s = buy_component(sample_state, "cpu_budget")
+    s = buy_component(s, "ram_8gb")
+    s = buy_component(s, "hdd_500gb")
+    s = buy_component(s, "nic_1g")
+    cpu_id = s.hardware_inventory[0].id
+    ram_id = s.hardware_inventory[1].id
+    stor_id = s.hardware_inventory[2].id
+    nic_id = s.hardware_inventory[3].id
+    s, srv = assemble_server(s, "WebBox", cpu_id, [ram_id], [stor_id], nic_id)
+    assert srv.rack_id is None
+    s = install_server_in_rack(s, "WebBox", 0)
+    assert s.servers[0].rack_id == s.racks[0].id
+
+
+def test_install_server_wrong_name_raises(sample_state):
+    from game.datacenter import install_server_in_rack
+    with pytest.raises(ValueError, match="No server"):
+        install_server_in_rack(sample_state, "Ghost", 0)
+
+
+def test_install_server_rack_out_of_range(sample_state):
+    from game.datacenter import buy_component, assemble_server, install_server_in_rack
+    s = buy_component(sample_state, "cpu_budget")
+    s = buy_component(s, "ram_8gb")
+    s = buy_component(s, "hdd_500gb")
+    s = buy_component(s, "nic_1g")
+    cpu_id = s.hardware_inventory[0].id
+    ram_id = s.hardware_inventory[1].id
+    stor_id = s.hardware_inventory[2].id
+    nic_id = s.hardware_inventory[3].id
+    s, srv = assemble_server(s, "Box", cpu_id, [ram_id], [stor_id], nic_id)
+    with pytest.raises(ValueError, match="does not exist"):
+        install_server_in_rack(s, "Box", 99)
+
+
+def test_repair_server(sample_state):
+    from game.datacenter import buy_component, assemble_server, repair_server
+    s = buy_component(sample_state, "cpu_budget")
+    s = buy_component(s, "ram_8gb")
+    s = buy_component(s, "hdd_500gb")
+    s = buy_component(s, "nic_1g")
+    cpu_id = s.hardware_inventory[0].id
+    ram_id = s.hardware_inventory[1].id
+    stor_id = s.hardware_inventory[2].id
+    nic_id = s.hardware_inventory[3].id
+    s, srv = assemble_server(s, "FixBox", cpu_id, [ram_id], [stor_id], nic_id)
+    s.servers[0].health = 0.5
+    old_cash = s.cash
+    s = repair_server(s, "FixBox")
+    assert s.servers[0].health == 1.0
+    assert s.cash == old_cash - 500.0
+
+
+def test_repair_healthy_server_raises(sample_state):
+    from game.datacenter import buy_component, assemble_server, repair_server
+    s = buy_component(sample_state, "cpu_budget")
+    s = buy_component(s, "ram_8gb")
+    s = buy_component(s, "hdd_500gb")
+    s = buy_component(s, "nic_1g")
+    cpu_id = s.hardware_inventory[0].id
+    ram_id = s.hardware_inventory[1].id
+    stor_id = s.hardware_inventory[2].id
+    nic_id = s.hardware_inventory[3].id
+    s, srv = assemble_server(s, "HealthyBox", cpu_id, [ram_id], [stor_id], nic_id)
+    with pytest.raises(ValueError, match="already at full health"):
+        repair_server(s, "HealthyBox")
