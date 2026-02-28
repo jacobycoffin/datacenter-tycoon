@@ -248,11 +248,113 @@ class MainScreen(Screen):
             del s.portfolio[ticker]
         return True, f"Sold {qty} {ticker} @ ${price:.2f}  (+${proceeds:,.2f})"
 
-    # ── Placeholder stubs (Tasks 6-8 pending) ─────────────────────
-    def _cmd_transfer(self, args): return False, "Not yet implemented"
-    def _cmd_loan(self, args):     return False, "Not yet implemented"
-    def _cmd_bond(self, args):     return False, "Not yet implemented"
-    def _cmd_sellbond(self, args): return False, "Not yet implemented"
+    # ── Task 6: Banking commands ───────────────────────────────────
+    def _cmd_transfer(self, args):
+        # transfer <amount> savings|checking
+        if len(args) != 2 or args[1] not in ("savings", "checking"):
+            return False, "Usage: transfer <amount> savings|checking"
+        try:
+            amt = float(args[0].replace(",", "").replace("$", ""))
+        except ValueError:
+            return False, "Usage: transfer <amount> savings|checking"
+        if amt <= 0:
+            return False, "Amount must be positive"
+        s = self.app.state
+        if args[1] == "savings":
+            if amt > s.cash:
+                return False, f"Insufficient checking: have ${s.cash:,.2f}"
+            s.cash -= amt
+            s.savings += amt
+            return True, f"Moved ${amt:,.2f} → savings (savings: ${s.savings:,.2f})"
+        else:
+            if amt > s.savings:
+                return False, f"Insufficient savings: have ${s.savings:,.2f}"
+            s.savings -= amt
+            s.cash += amt
+            return True, f"Moved ${amt:,.2f} → checking (checking: ${s.cash:,.2f})"
+
+    def _cmd_loan(self, args):
+        # loan <amount> <months>
+        import uuid
+        from game.finance import loan_interest_rate_for_credit_score, calculate_loan_payment
+        if len(args) != 2:
+            return False, "Usage: loan <amount> <months>  (months: 6, 12, or 24)"
+        try:
+            amt = float(args[0].replace(",", "").replace("$", ""))
+            months = int(args[1])
+        except ValueError:
+            return False, "Usage: loan <amount> <months>"
+        if months not in (6, 12, 24):
+            return False, "Term must be 6, 12, or 24 months"
+        if not (5000 <= amt <= 500000):
+            return False, "Loan amount must be $5,000–$500,000"
+        s = self.app.state
+        rate = loan_interest_rate_for_credit_score(s.credit_score)
+        payment = calculate_loan_payment(amt, rate, months)
+        loan = {
+            "id": str(uuid.uuid4()),
+            "principal": amt,
+            "remaining_balance": amt,
+            "annual_rate": rate,
+            "term_days": months * 30,
+            "days_remaining": months * 30,
+            "monthly_payment": round(payment, 2),
+        }
+        s.loans.append(loan)
+        s.cash += amt
+        return True, f"Loan approved: ${amt:,.2f} at {rate*100:.1f}% APR, ${payment:,.2f}/mo for {months} months"
+
+    def _cmd_bond(self, args):
+        # bond <amount>  — 30-day maturity, 15% yield
+        import uuid
+        if len(args) != 1:
+            return False, "Usage: bond <amount>  (min $1,000)"
+        try:
+            amt = float(args[0].replace(",", "").replace("$", ""))
+        except ValueError:
+            return False, "Usage: bond <amount>"
+        if amt < 1000:
+            return False, "Minimum bond purchase is $1,000"
+        s = self.app.state
+        if amt > s.cash:
+            return False, f"Insufficient funds: need ${amt:,.2f}, have ${s.cash:,.2f}"
+        bond = {
+            "id": str(uuid.uuid4()),
+            "face_value": amt,
+            "annual_yield": 0.15,
+            "maturity_days": 30,
+            "days_remaining": 30,
+            "purchase_price": amt,
+        }
+        s.bonds.append(bond)
+        s.cash -= amt
+        return True, f"Bond purchased: ${amt:,.2f} at 15%/yr, matures in 30 days"
+
+    def _cmd_sellbond(self, args):
+        # sellbond <n>  — sell bond #n early at discounted value
+        from game.finance import bond_current_value
+        if len(args) != 1:
+            return False, "Usage: sellbond <n>"
+        try:
+            idx = int(args[0]) - 1
+        except ValueError:
+            return False, "Usage: sellbond <n>  (n is the bond number)"
+        s = self.app.state
+        if idx < 0 or idx >= len(s.bonds):
+            return False, f"No bond #{idx+1}"
+        bond = s.bonds[idx]
+        fv = bond["face_value"] if isinstance(bond, dict) else bond.face_value
+        yld = bond["annual_yield"] if isinstance(bond, dict) else bond.annual_yield
+        days_rem = bond["days_remaining"] if isinstance(bond, dict) else bond.days_remaining
+        mat_days = bond["maturity_days"] if isinstance(bond, dict) else bond.maturity_days
+        value = bond_current_value(fv, yld, days_rem, mat_days)
+        s.cash += value
+        s.bonds.pop(idx)
+        diff = value - fv
+        sign = "+" if diff >= 0 else ""
+        return True, f"Sold bond for ${value:,.2f} (face ${fv:,.2f}, {sign}${diff:,.2f})"
+
+    # ── Placeholder stubs (Tasks 7-8 pending) ─────────────────────
     def _cmd_accept(self, args):   return False, "Not yet implemented"
     def _cmd_decline(self, args):  return False, "Not yet implemented"
     def _cmd_negotiate(self, args):return False, "Not yet implemented"
