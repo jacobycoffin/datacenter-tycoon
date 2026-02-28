@@ -198,9 +198,57 @@ class MainScreen(Screen):
         self.query_one("#cmd-feedback", Static).update(help_text)
         return True, ""
 
-    # ── Placeholder stubs (implemented in Tasks 5-8) ──────────────
-    def _cmd_buy(self, args):      return False, "Not yet implemented"
-    def _cmd_sell(self, args):     return False, "Not yet implemented"
+    # ── Task 5: Market commands ────────────────────────────────────
+    def _cmd_buy(self, args):
+        # buy <qty> <ticker>
+        if len(args) != 2:
+            return False, "Usage: buy <qty> <ticker>"
+        try:
+            qty = int(args[0])
+        except ValueError:
+            return False, "Usage: buy <qty> <ticker>  (qty must be a number)"
+        ticker = args[1].upper()
+        s = self.app.state
+        price = s.market_prices.get(ticker)
+        if price is None:
+            return False, f"Unknown ticker '{ticker}'"
+        if qty <= 0:
+            return False, "Quantity must be positive"
+        cost = price * qty
+        if s.cash < cost:
+            return False, f"Insufficient funds: need ${cost:,.2f}, have ${s.cash:,.2f}"
+        s.cash -= cost
+        holding = s.portfolio.setdefault(ticker, {"shares": 0, "avg_cost": 0.0})
+        total = holding["shares"] + qty
+        holding["avg_cost"] = (holding["avg_cost"] * holding["shares"] + cost) / total
+        holding["shares"] = total
+        return True, f"Bought {qty} {ticker} @ ${price:.2f}  (-${cost:,.2f})"
+
+    def _cmd_sell(self, args):
+        # sell <qty> <ticker>
+        if len(args) != 2:
+            return False, "Usage: sell <qty> <ticker>"
+        try:
+            qty = int(args[0])
+        except ValueError:
+            return False, "Usage: sell <qty> <ticker>  (qty must be a number)"
+        ticker = args[1].upper()
+        s = self.app.state
+        price = s.market_prices.get(ticker)
+        if price is None:
+            return False, f"Unknown ticker '{ticker}'"
+        holding = s.portfolio.get(ticker, {})
+        owned = holding.get("shares", 0)
+        if qty <= 0 or qty > owned:
+            return False, f"You own {owned} shares of {ticker}"
+        proceeds = price * qty
+        s.cash += proceeds
+        holding["shares"] -= qty
+        if holding["shares"] == 0:
+            del s.portfolio[ticker]
+        return True, f"Sold {qty} {ticker} @ ${price:.2f}  (+${proceeds:,.2f})"
+
+    # ── Placeholder stubs (Tasks 6-8 pending) ─────────────────────
     def _cmd_transfer(self, args): return False, "Not yet implemented"
     def _cmd_loan(self, args):     return False, "Not yet implemented"
     def _cmd_bond(self, args):     return False, "Not yet implemented"
