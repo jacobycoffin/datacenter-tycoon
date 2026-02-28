@@ -1,0 +1,14 @@
+[
+  {"ticker": "NVLT", "name": "Novaltex Chips",      "sector": "semiconductors",    "base_price": 145.00},
+  {"ticker": "CLOD", "name": "CloudHive Inc",       "sector": "cloud",             "base_price": 88.50},
+  {"ticker": "SVLT", "name": "ServerVault Corp",    "sector": "hosting",           "base_price": 52.20},
+  {"ticker": "CBLX", "name": "Cablexa Networks",    "sector": "networking",        "base_price": 34.10},
+  {"ticker": "DRVE", "name": "DriveMax Storage",    "sector": "storage",           "base_price": 67.80},
+  {"ticker": "SECR", "name": "SecureGrid Systems",  "sector": "security",          "base_price": 112.00},
+  {"ticker": "PRMX", "name": "Promax Compute",      "sector": "compute",           "base_price": 203.40},
+  {"ticker": "HYPR", "name": "HyperFrame AI",       "sector": "ai",                "base_price": 289.00},
+  {"ticker": "CDGE", "name": "CoolEdge Cooling",    "sector": "infrastructure",    "base_price": 28.90},
+  {"ticker": "BNDL", "name": "BandLink Fiber",      "sector": "networking",        "base_price": 41.20},
+  {"ticker": "VRTX", "name": "Vertix Data",         "sector": "hosting",           "base_price": 76.60},
+  {"ticker": "MNGE", "name": "ManageCore Inc",      "sector": "managed services",  "base_price": 59.30}
+]
