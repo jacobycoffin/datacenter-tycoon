@@ -1,0 +1,20 @@
+{
+  "names": [
+    "Apex Analytics", "BlueSky Hosting", "CortexAI Labs", "DataForge Inc",
+    "Ember Studios", "FusionCloud", "GridLogic Systems", "Helix Bio",
+    "IndigoMedia", "JetStream Apps", "Kestrel Finance", "LunaStack",
+    "Maven Research", "Nexus Gaming", "Orbit Commerce"
+  ],
+  "gig_templates": [
+    {"title": "Network audit for local bakery",      "payout_range": [200, 400]},
+    {"title": "Data recovery from failed drive",     "payout_range": [400, 700]},
+    {"title": "VPN setup for small office",          "payout_range": [300, 600]},
+    {"title": "Security scan for startup",           "payout_range": [500, 900]},
+    {"title": "Server rack cabling job",             "payout_range": [250, 450]},
+    {"title": "Firewall config for restaurant",      "payout_range": [200, 500]},
+    {"title": "Backup solution for law firm",        "payout_range": [600, 1200]},
+    {"title": "Network speed troubleshooting",       "payout_range": [150, 350]},
+    {"title": "Email server migration",              "payout_range": [800, 1500]},
+    {"title": "SSL certificate setup",               "payout_range": [100, 300]}
+  ]
+}

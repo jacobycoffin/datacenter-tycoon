@@ -52,6 +52,7 @@ class Contract:
     server_id: Optional[str] = None
     status: str = "pending"  # "pending" | "active" | "breached" | "complete"
     sla_health: float = 1.0
+    days_degraded: int = 0
 
 
 @dataclass
