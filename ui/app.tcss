@@ -1,0 +1,29 @@
+Screen {
+    background: #0d1117;
+    color: #c9d1d9;
+}
+
+Header {
+    background: #161b22;
+    color: #58a6ff;
+    text-style: bold;
+}
+
+Footer {
+    background: #161b22;
+    color: #8b949e;
+}
+
+.panel {
+    border: solid #30363d;
+    padding: 1 2;
+    margin: 0 1;
+}
+
+.money-positive { color: #3fb950; }
+.money-negative { color: #f85149; }
+.money-neutral  { color: #c9d1d9; }
+
+.sla-green  { color: #3fb950; }
+.sla-yellow { color: #e3b341; }
+.sla-red    { color: #f85149; }
