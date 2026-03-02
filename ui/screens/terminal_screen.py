@@ -448,12 +448,196 @@ class TerminalScreen(Screen):
         self._log(f"Closed {old} panel.")
 
     def _render_open_panel(self) -> None:
-        """Renders content into #open-panel. Full implementation in Task 6."""
+        """Dispatch to the appropriate panel renderer based on _open_target."""
         if self._open_target is None:
             return
-        self.query_one("#open-panel", Static).update(
-            f"[#9d4edd]── {self._open_target.upper()} ──[/]\n[dim]Panel content coming in Task 6[/]"
-        )
+        renderers = {
+            "store":     self._panel_store,
+            "contracts": self._panel_contracts,
+            "market":    self._panel_market,
+            "servers":   self._panel_servers,
+            "racks":     self._panel_racks,
+            "gigs":      self._panel_gigs,
+            "banking":   self._panel_banking,
+        }
+        fn = renderers.get(self._open_target)
+        if fn:
+            self.query_one("#open-panel", Static).update(fn())
+        else:
+            self.query_one("#open-panel", Static).update(
+                f"[#9d4edd]── {self._open_target.upper()} ──[/]\n[dim]No renderer for '{self._open_target}'[/]"
+            )
+
+    def _panel_store(self) -> str:
+        import json
+        from pathlib import Path
+        hw_path = Path(__file__).resolve().parent.parent.parent / "data" / "hardware.json"
+        hw = json.loads(hw_path.read_text())
+        lines = ["[#9d4edd]── HARDWARE STORE ──[/]",
+                 "[dim]Use: buyhw <id>[/]", ""]
+        for category, items in hw.items():
+            lines.append(f"[bold #9d4edd]{category.upper()}[/]")
+            for item in items:
+                lines.append(f"  {item['id']:<18} {item['name']:<28} [#00ff41]${item['price']:>6,.0f}[/]")
+            lines.append("")
+        return "\n".join(lines)
+
+    def _panel_contracts(self) -> str:
+        s = self.app.state
+        lines = ["[#9d4edd]── PENDING CONTRACT OFFERS ──[/]",
+                 "[dim]Use: accept <n>  decline <n>  negotiate <n> <pct>[/]", ""]
+        if not s.pending_contracts:
+            lines.append("  [dim]No pending offers.[/]")
+        else:
+            for i, c in enumerate(s.pending_contracts):
+                name = self._ga(c, "client_name", "?")
+                rev = self._ga(c, "monthly_revenue", 0)
+                cores = self._ga(c, "required_cores", 0)
+                ram = self._ga(c, "required_ram_gb", 0)
+                storage = self._ga(c, "required_storage_gb", 0)
+                sla = self._ga(c, "sla_tier", "?")
+                dur = self._ga(c, "duration_days", 0)
+                lines.append(f"  [bold]{i+1}.[/] {name}")
+                lines.append(f"      [#00ff41]${rev:,.2f}/mo[/]  {dur}d  SLA {sla}%")
+                lines.append(f"      Needs: {cores}c / {ram}GB RAM / {storage}GB storage")
+                lines.append("")
+        return "\n".join(lines)
+
+    def _panel_market(self) -> str:
+        s = self.app.state
+        lines = ["[#9d4edd]── MARKET ──[/]",
+                 "[dim]Use: buy <qty> <ticker>  sell <qty> <ticker>[/]", ""]
+        for ticker, price in sorted(s.market_prices.items()):
+            hist = s.price_history.get(ticker, [price])
+            prev = hist[-2] if len(hist) >= 2 else price
+            chg = price - prev
+            chg_pct = (chg / prev * 100) if prev else 0
+            color = "green" if chg >= 0 else "red"
+            owned = s.portfolio.get(ticker, {}).get("shares", 0)
+            owned_str = f"  [dim]own:{owned}[/]" if owned else ""
+            lines.append(f"  {ticker:<6} [#00ff41]${price:>8.2f}[/]  [{color}]{chg_pct:+.2f}%[/]{owned_str}")
+        return "\n".join(lines)
+
+    def _panel_servers(self) -> str:
+        s = self.app.state
+        lines = ["[#9d4edd]── SERVERS ──[/]",
+                 "[dim]Use: install <server_id> <rack_id>  repair <server_id>[/]", ""]
+        if not s.servers:
+            lines.append("  [dim]No servers assembled.[/]")
+        else:
+            for srv in s.servers:
+                name = self._ga(srv, "name", "?")
+                sid = self._ga(srv, "id", "?")[:8]
+                cores = self._ga(srv, "total_cores", 0)
+                ram = self._ga(srv, "total_ram_gb", 0)
+                storage = self._ga(srv, "total_storage_gb", 0)
+                health = self._ga(srv, "health", 1.0)
+                rack_id = self._ga(srv, "rack_id", None)
+                health_color = "green" if health > 0.7 else ("yellow" if health > 0.3 else "red")
+                rack_str = f"rack:{rack_id[:6]}" if rack_id else "[dim]uninstalled[/]"
+                lines.append(f"  {name} [dim]({sid})[/]")
+                lines.append(f"    {cores}c/{ram}GB/{storage}GB  [{health_color}]{health:.0%}[/]  {rack_str}")
+                lines.append("")
+        return "\n".join(lines)
+
+    def _panel_racks(self) -> str:
+        s = self.app.state
+        lines = ["[#9d4edd]── RACKS ──[/]",
+                 "[dim]Use: install <server_id> <rack_id>  rent[/]", ""]
+        if not s.racks:
+            lines.append("  [dim]No racks rented. Use 'rent' to add one.[/]")
+        else:
+            for rack in s.racks:
+                rid = self._ga(rack, "id", "?")
+                rname = self._ga(rack, "name", "?")
+                tier = self._ga(rack, "location_tier", "?")
+                rent = self._ga(rack, "monthly_rent", 0)
+                total_u = self._ga(rack, "total_u", 12)
+                installed = [srv for srv in s.servers if self._ga(srv, "rack_id", None) == rid]
+                lines.append(f"  [bold]{rname}[/] [dim]({rid[:8]})[/]  {tier}  ${rent:,.0f}/mo")
+                # ASCII rack diagram
+                lines.append("  ┌──────────────────────────┐")
+                srv_map = {}
+                slot = 0
+                for srv in installed:
+                    size = self._ga(srv, "size_u", 1)
+                    start = self._ga(srv, "slot_start", None) or slot
+                    for u in range(size):
+                        srv_map[start + u] = (srv, u == 0)
+                    slot = start + size
+                for u in range(total_u):
+                    if u in srv_map:
+                        srv, is_top = srv_map[u]
+                        health = self._ga(srv, "health", 1.0)
+                        hc = "green" if health > 0.7 else ("yellow" if health > 0.3 else "red")
+                        label = self._ga(srv, "name", "?")[:14] if is_top else "  └─────────────"
+                        lines.append(f"  │ [{hc}]{u+1:02d}U {label:<14}[/] │")
+                    else:
+                        lines.append(f"  │ [dim]{u+1:02d}U  ── empty ──────[/] │")
+                lines.append("  └──────────────────────────┘")
+                lines.append("")
+        return "\n".join(lines)
+
+    def _panel_gigs(self) -> str:
+        s = self.app.state
+        lines = ["[#9d4edd]── GIG BOARD ──[/]",
+                 "[dim]Use: gig <n>[/]", ""]
+        if not s.available_gigs:
+            lines.append("  [dim]No gigs available today.[/]")
+        else:
+            for i, gig in enumerate(s.available_gigs):
+                title = self._ga(gig, "title", "?")
+                payout = self._ga(gig, "payout", 0)
+                gid = self._ga(gig, "id", "?")[:6]
+                lines.append(f"  [bold]{i+1}.[/] [#ffb703]${payout:,.2f}[/]  {title}")
+                lines.append(f"      [dim]id:{gid}[/]")
+                lines.append("")
+        return "\n".join(lines)
+
+    def _panel_banking(self) -> str:
+        s = self.app.state
+        from game.finance import loan_interest_rate_for_credit_score
+        rate = loan_interest_rate_for_credit_score(s.credit_score)
+        lines = [
+            "[#9d4edd]── BANKING ──[/]",
+            "[dim]Use: transfer to|from savings <amt>  loan <amt> [term]  bond <amt> [days]  sellbond <id>[/]",
+            "",
+            f"  Checking:    [#00ff41]${s.cash:>12,.2f}[/]",
+            f"  Savings:     [#00ff41]${s.savings:>12,.2f}[/]  (6%/yr)",
+            f"  Credit:      {s.credit_score}  (loan rate: {rate*100:.1f}% APR)",
+            "",
+            "[bold]Loans:[/]",
+        ]
+        if not s.loans:
+            lines.append("  [dim]No active loans.[/]")
+        else:
+            for loan in s.loans:
+                balance = self._ga(loan, "remaining_balance", 0)
+                payment = self._ga(loan, "monthly_payment", 0)
+                days = self._ga(loan, "days_remaining", 0)
+                lines.append(f"  ${balance:,.2f} remaining  ${payment:,.2f}/mo  {days}d left")
+        lines.append("")
+        lines.append("[bold]Bonds:[/]")
+        if not s.bonds:
+            lines.append("  [dim]No bonds held.[/]")
+        else:
+            for bond in s.bonds:
+                fv = self._ga(bond, "face_value", 0)
+                yld = self._ga(bond, "annual_yield", 0)
+                days = self._ga(bond, "days_remaining", 0)
+                bid = self._ga(bond, "id", "?")[:8]
+                lines.append(f"  [dim]({bid})[/]  ${fv:,.2f}  {yld*100:.0f}%/yr  {days}d  [dim]sellbond {bid}[/]")
+        lines.append("")
+        lines.append("[bold]CDs:[/]")
+        if not s.cds:
+            lines.append("  [dim]No CDs.[/]")
+        else:
+            for cd in s.cds:
+                balance = self._ga(cd, "balance", 0)
+                rate_cd = self._ga(cd, "annual_rate", 0.15)
+                days = self._ga(cd, "days_remaining", 0)
+                lines.append(f"  ${balance:,.2f}  {rate_cd*100:.0f}%/yr  {days}d remaining")
+        return "\n".join(lines)
 
     def _cmd_buy(self, args: list[str]) -> None:
         self._log("[dim]Command registered — full implementation in next task.[/]")
