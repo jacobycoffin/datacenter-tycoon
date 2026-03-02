@@ -434,7 +434,7 @@ class TerminalScreen(Screen):
             return
         self._open_target = target
         self._update_visibility()
-        self._render_open_panel()  # stub until Task 6
+        self._render_open_panel()
         self._log(f"Opened [#9d4edd]{target}[/]. Type 'close' to dismiss.")
 
     def _cmd_close(self, args: list[str]) -> None:
