@@ -6,16 +6,16 @@ from textual.widgets import RichLog, Input, Static
 from textual.containers import Horizontal
 
 BOOT_LINES = [
-    ("DATACENTER OS v1.0.0", "green"),
-    ("Copyright (C) 2026 Datacenter Tycoon Corp", "green"),
-    ("", "green"),
-    ("Initializing memory...             [bold green][ OK ][/]", "green"),
-    ("Loading kernel modules...          [bold green][ OK ][/]", "green"),
-    ("Mounting filesystems...            [bold green][ OK ][/]", "green"),
-    ("Starting network services...       [bold green][ OK ][/]", "green"),
-    ("[#9d4edd]──────────────────────────────────────────[/]", "plain"),
-    ("[#9d4edd] DATACENTER TYCOON TERMINAL[/]", "plain"),
-    ("[#9d4edd]──────────────────────────────────────────[/]", "plain"),
+    "DATACENTER OS v1.0.0",
+    "Copyright (C) 2026 Datacenter Tycoon Corp",
+    "",
+    "Initializing memory...             [bold green][ OK ][/]",
+    "Loading kernel modules...          [bold green][ OK ][/]",
+    "Mounting filesystems...            [bold green][ OK ][/]",
+    "Starting network services...       [bold green][ OK ][/]",
+    "[#9d4edd]──────────────────────────────────────────[/]",
+    "[#9d4edd] DATACENTER TYCOON TERMINAL[/]",
+    "[#9d4edd]──────────────────────────────────────────[/]",
 ]
 
 class BootScreen(Screen):
@@ -34,7 +34,7 @@ class BootScreen(Screen):
 
     async def _run_boot(self) -> None:
         log = self.query_one("#boot-log", RichLog)
-        for line, color in BOOT_LINES:
+        for line in BOOT_LINES:
             log.write(line)
             await asyncio.sleep(0.06)
 
@@ -133,13 +133,12 @@ class BootScreen(Screen):
         await asyncio.sleep(0.06)
         log.write("")
 
-        starting_cash = {"easy": 75000.0, "normal": 50000.0, "hard": 25000.0}[difficulty]
         state = initialize_new_game(name, difficulty)
         save_game(state)
         self.app.state = state
 
         log.write("Welcome to [bold #9d4edd]DATACENTER TYCOON[/].")
-        log.write(f"You have been allocated [#00ff41]${starting_cash:,.2f}[/] in seed funding.")
+        log.write(f"You have been allocated [#00ff41]${state.cash:,.2f}[/] in seed funding.")
         log.write("")
         log.write("Type [bold #9d4edd]'help'[/] to begin.")
         log.write("")
