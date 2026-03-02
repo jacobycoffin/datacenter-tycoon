@@ -934,6 +934,7 @@ class TerminalScreen(Screen):
         else:
             from game.save import save_game
             save_game(self.app.state)
+            self._refresh_pin_panel()
             if self._open_target == "contracts":
                 self._render_open_panel()
             self._log("[red]Counter-offer rejected.[/]")
