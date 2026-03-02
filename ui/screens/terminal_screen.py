@@ -41,6 +41,11 @@ class TerminalScreen(Screen):
     def _log(self, text: str) -> None:
         self.query_one("#terminal", RichLog).write(text)
 
+    @staticmethod
+    def _ga(obj, attr: str, default=0):
+        """Get attribute from a dataclass instance or a plain dict (after JSON load)."""
+        return obj.get(attr, default) if isinstance(obj, dict) else getattr(obj, attr, default)
+
     def _refresh_pin_panel(self) -> None:
         if not self._pinned_metrics:
             return
@@ -52,21 +57,17 @@ class TerminalScreen(Screen):
             lines.append(f"Cash  [#00ff41]${s.cash:,.0f}[/]")
         if "day" in self._pinned_metrics:
             lines.append(f"Day   [#00ff41]{s.day}[/]")
+        if "income" in self._pinned_metrics or "net" in self._pinned_metrics:
+            income = sum(self._ga(c, "monthly_revenue") for c in s.active_contracts)
         if "income" in self._pinned_metrics:
-            income = sum(c.monthly_revenue if not isinstance(c, dict) else c.get("monthly_revenue", 0)
-                         for c in s.active_contracts)
             lines.append(f"Inc   [#00ff41]+${income:,.0f}/mo[/]")
         if "rep" in self._pinned_metrics:
             lines.append(f"Rep   [#00ff41]{s.reputation}[/]")
         if "credit" in self._pinned_metrics:
             lines.append(f"Cred  [#00ff41]{s.credit_score}[/]")
         if "net" in self._pinned_metrics:
-            income = sum(c.monthly_revenue if not isinstance(c, dict) else c.get("monthly_revenue", 0)
-                         for c in s.active_contracts)
-            rent = sum(r.monthly_rent if not isinstance(r, dict) else r.get("monthly_rent", 0)
-                       for r in s.racks)
-            loans = sum(l.monthly_payment if not isinstance(l, dict) else l.get("monthly_payment", 0)
-                        for l in s.loans)
+            rent = sum(self._ga(r, "monthly_rent") for r in s.racks)
+            loans = sum(self._ga(l, "monthly_payment") for l in s.loans)
             net = income - rent - loans
             color = "green" if net >= 0 else "red"
             sign = "+" if net >= 0 else ""
@@ -268,6 +269,8 @@ class TerminalScreen(Screen):
 
     def _render_open_panel(self) -> None:
         """Renders content into #open-panel. Full implementation in Task 6."""
+        if self._open_target is None:
+            return
         self.query_one("#open-panel", Static).update(
             f"[#9d4edd]── {self._open_target.upper()} ──[/]\n[dim]Panel content coming in Task 6[/]"
         )
