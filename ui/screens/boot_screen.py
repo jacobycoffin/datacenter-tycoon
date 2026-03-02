@@ -14,7 +14,7 @@ def _attr(obj, key, default=0):
     return getattr(obj, key, default)
 
 BOOT_LINES = [
-    "DATACENTER OS v1.0.0",
+    "DATACENTER OS v2.0.0",
     "Copyright (C) 2026 Datacenter Tycoon Corp",
     "",
     "Initializing memory...             [bold green][ OK ][/]",
@@ -160,11 +160,5 @@ class BootScreen(Screen):
         await self._launch_terminal()
 
     async def _launch_terminal(self) -> None:
-        # TerminalScreen will be created in Task 3; import lazily to avoid circular errors
-        # For now, just push a stub. When terminal_screen.py exists, this will work.
-        try:
-            from ui.screens.terminal_screen import TerminalScreen
-            self.app.push_screen(TerminalScreen())
-        except ImportError:
-            # terminal_screen.py not yet created (Task 3)
-            pass
+        from ui.screens.terminal_screen import TerminalScreen
+        self.app.push_screen(TerminalScreen())
