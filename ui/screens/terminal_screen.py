@@ -640,49 +640,534 @@ class TerminalScreen(Screen):
         return "\n".join(lines)
 
     def _cmd_buy(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        if len(args) != 2:
+            self._log("[red]Usage: buy <qty> <ticker>[/]")
+            return
+        try:
+            qty = int(args[0])
+        except ValueError:
+            self._log("[red]Usage: buy <qty> <ticker>  (qty must be a number)[/]")
+            return
+        ticker = args[1].upper()
+        s = self.app.state
+        price = s.market_prices.get(ticker)
+        if price is None:
+            self._log(f"[red]Unknown ticker '{ticker}'[/]")
+            return
+        if qty <= 0:
+            self._log("[red]Quantity must be positive[/]")
+            return
+        cost = price * qty
+        if s.cash < cost:
+            self._log(f"[red]Insufficient funds: need ${cost:,.2f}, have ${s.cash:,.2f}[/]")
+            return
+        s.cash -= cost
+        holding = s.portfolio.setdefault(ticker, {"shares": 0, "avg_cost": 0.0})
+        total = holding["shares"] + qty
+        holding["avg_cost"] = (holding["avg_cost"] * holding["shares"] + cost) / total
+        holding["shares"] = total
+        from game.save import save_game
+        save_game(self.app.state)
+        self._refresh_pin_panel()
+        if self._open_target == "market":
+            self._render_open_panel()
+        self._log(f"[#00ff41]Bought {qty} {ticker} @ ${price:.2f}  (-${cost:,.2f})[/]")
 
     def _cmd_sell(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        if len(args) != 2:
+            self._log("[red]Usage: sell <qty> <ticker>[/]")
+            return
+        try:
+            qty = int(args[0])
+        except ValueError:
+            self._log("[red]Usage: sell <qty> <ticker>  (qty must be a number)[/]")
+            return
+        ticker = args[1].upper()
+        s = self.app.state
+        price = s.market_prices.get(ticker)
+        if price is None:
+            self._log(f"[red]Unknown ticker '{ticker}'[/]")
+            return
+        holding = s.portfolio.get(ticker, {})
+        owned = holding.get("shares", 0)
+        if qty <= 0 or qty > owned:
+            self._log(f"[red]You own {owned} shares of {ticker}[/]")
+            return
+        proceeds = price * qty
+        s.cash += proceeds
+        holding["shares"] -= qty
+        if holding["shares"] == 0:
+            del s.portfolio[ticker]
+        from game.save import save_game
+        save_game(self.app.state)
+        self._refresh_pin_panel()
+        if self._open_target == "market":
+            self._render_open_panel()
+        self._log(f"[#00ff41]Sold {qty} {ticker} @ ${price:.2f}  (+${proceeds:,.2f})[/]")
 
     def _cmd_transfer(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        if len(args) != 3 or args[0] not in ("to", "from") or args[1] != "savings":
+            self._log("[red]Usage: transfer to|from savings <amount>[/]")
+            return
+        direction = args[0]
+        try:
+            amt = float(args[2].replace(",", "").replace("$", ""))
+        except ValueError:
+            self._log("[red]Usage: transfer to|from savings <amount>[/]")
+            return
+        if amt <= 0:
+            self._log("[red]Amount must be positive[/]")
+            return
+        s = self.app.state
+        if direction == "to":
+            if amt > s.cash:
+                self._log(f"[red]Insufficient checking: have ${s.cash:,.2f}[/]")
+                return
+            s.cash -= amt
+            s.savings += amt
+            msg = f"[#00ff41]Moved ${amt:,.2f} → savings (savings: ${s.savings:,.2f})[/]"
+        else:
+            if amt > s.savings:
+                self._log(f"[red]Insufficient savings: have ${s.savings:,.2f}[/]")
+                return
+            s.savings -= amt
+            s.cash += amt
+            msg = f"[#00ff41]Moved ${amt:,.2f} → checking (checking: ${s.cash:,.2f})[/]"
+        from game.save import save_game
+        save_game(self.app.state)
+        self._refresh_pin_panel()
+        if self._open_target == "banking":
+            self._render_open_panel()
+        self._log(msg)
 
     def _cmd_loan(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        import uuid
+        from game.finance import loan_interest_rate_for_credit_score, calculate_loan_payment
+        if not args or len(args) > 2:
+            self._log("[red]Usage: loan <amount> [term]  (term: 6, 12, or 24 months)[/]")
+            return
+        try:
+            amt = float(args[0].replace(",", "").replace("$", ""))
+            months = int(args[1]) if len(args) > 1 else 12
+        except ValueError:
+            self._log("[red]Usage: loan <amount> [term][/]")
+            return
+        if months not in (6, 12, 24):
+            self._log("[red]Term must be 6, 12, or 24 months[/]")
+            return
+        if not (5000 <= amt <= 500000):
+            self._log("[red]Loan amount must be $5,000–$500,000[/]")
+            return
+        s = self.app.state
+        rate = loan_interest_rate_for_credit_score(s.credit_score)
+        payment = calculate_loan_payment(amt, rate, months)
+        loan = {
+            "id": str(uuid.uuid4()),
+            "principal": amt,
+            "remaining_balance": amt,
+            "annual_rate": rate,
+            "term_days": months * 30,
+            "days_remaining": months * 30,
+            "monthly_payment": round(payment, 2),
+        }
+        s.loans.append(loan)
+        s.cash += amt
+        from game.save import save_game
+        save_game(self.app.state)
+        self._refresh_pin_panel()
+        if self._open_target == "banking":
+            self._render_open_panel()
+        self._log(f"[#00ff41]Loan approved: ${amt:,.2f} at {rate*100:.1f}% APR, ${payment:,.2f}/mo for {months} months[/]")
 
     def _cmd_bond(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        import uuid
+        YIELDS = {30: 0.12, 60: 0.14, 90: 0.16, 180: 0.18}
+        if not args or len(args) > 2:
+            self._log("[red]Usage: bond <amount> [days]  (days: 30, 60, 90, or 180)[/]")
+            return
+        try:
+            amt = float(args[0].replace(",", "").replace("$", ""))
+            days = int(args[1]) if len(args) > 1 else 30
+        except ValueError:
+            self._log("[red]Usage: bond <amount> [days][/]")
+            return
+        if days not in YIELDS:
+            self._log("[red]Term must be 30, 60, 90, or 180 days[/]")
+            return
+        if amt < 1000:
+            self._log("[red]Minimum bond purchase is $1,000[/]")
+            return
+        s = self.app.state
+        if amt > s.cash:
+            self._log(f"[red]Insufficient funds: need ${amt:,.2f}, have ${s.cash:,.2f}[/]")
+            return
+        annual_yield = YIELDS[days]
+        bond = {
+            "id": str(uuid.uuid4()),
+            "face_value": amt,
+            "annual_yield": annual_yield,
+            "maturity_days": days,
+            "days_remaining": days,
+            "purchase_price": amt,
+        }
+        s.bonds.append(bond)
+        s.cash -= amt
+        from game.save import save_game
+        save_game(self.app.state)
+        self._refresh_pin_panel()
+        if self._open_target == "banking":
+            self._render_open_panel()
+        self._log(f"[#00ff41]Bond purchased: ${amt:,.2f} at {annual_yield*100:.0f}%/yr, matures in {days} days[/]")
 
     def _cmd_sellbond(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        from game.finance import bond_current_value
+        if len(args) != 1:
+            self._log("[red]Usage: sellbond <id>[/]")
+            return
+        prefix = args[0]
+        s = self.app.state
+        idx = next(
+            (i for i, b in enumerate(s.bonds)
+             if (b.get("id", "") if isinstance(b, dict) else b.id).startswith(prefix)),
+            None
+        )
+        if idx is None:
+            self._log(f"[red]No bond with ID starting '{prefix}'[/]")
+            return
+        bond = s.bonds[idx]
+        fv = bond["face_value"] if isinstance(bond, dict) else bond.face_value
+        yld = bond["annual_yield"] if isinstance(bond, dict) else bond.annual_yield
+        days_rem = bond["days_remaining"] if isinstance(bond, dict) else bond.days_remaining
+        mat_days = bond["maturity_days"] if isinstance(bond, dict) else bond.maturity_days
+        value = bond_current_value(fv, yld, days_rem, mat_days)
+        s.cash += value
+        s.bonds.pop(idx)
+        diff = value - fv
+        sign = "+" if diff >= 0 else ""
+        from game.save import save_game
+        save_game(self.app.state)
+        self._refresh_pin_panel()
+        if self._open_target == "banking":
+            self._render_open_panel()
+        self._log(f"[#00ff41]Sold bond for ${value:,.2f} (face ${fv:,.2f}, {sign}${diff:,.2f})[/]")
 
     def _cmd_accept(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        if len(args) != 1:
+            self._log("[red]Usage: accept <n>[/]")
+            return
+        try:
+            idx = int(args[0]) - 1
+        except ValueError:
+            self._log("[red]Usage: accept <n>[/]")
+            return
+        s = self.app.state
+        if idx < 0 or idx >= len(s.pending_contracts):
+            self._log(f"[red]No offer #{idx+1}[/]")
+            return
+        contract = s.pending_contracts[idx]
+        if isinstance(contract, dict):
+            contract["status"] = "active"
+        else:
+            contract.status = "active"
+        s.active_contracts.append(contract)
+        s.pending_contracts.pop(idx)
+        client = contract.get("client_name", "?") if isinstance(contract, dict) else contract.client_name
+        from game.save import save_game
+        save_game(self.app.state)
+        self._refresh_pin_panel()
+        if self._open_target == "contracts":
+            self._render_open_panel()
+        self._log(f"[#00ff41]Contract accepted from {client}! Assign a server with: assign <server_id> <contract_id>[/]")
 
     def _cmd_decline(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        if len(args) != 1:
+            self._log("[red]Usage: decline <n>[/]")
+            return
+        try:
+            idx = int(args[0]) - 1
+        except ValueError:
+            self._log("[red]Usage: decline <n>[/]")
+            return
+        s = self.app.state
+        if idx < 0 or idx >= len(s.pending_contracts):
+            self._log(f"[red]No offer #{idx+1}[/]")
+            return
+        contract = s.pending_contracts.pop(idx)
+        client = contract.get("client_name", "?") if isinstance(contract, dict) else contract.client_name
+        from game.save import save_game
+        save_game(self.app.state)
+        self._refresh_pin_panel()
+        if self._open_target == "contracts":
+            self._render_open_panel()
+        self._log(f"[#00ff41]Declined offer from {client}.[/]")
 
     def _cmd_negotiate(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        from game.contracts import negotiate_contract
+        from game.models import Contract as ContractModel
+        # negotiate <n> [pct]  — counter-offer at +pct% (default 15%)
+        if not args:
+            self._log("[red]Usage: negotiate <n> [pct][/]")
+            return
+        try:
+            idx = int(args[0]) - 1
+        except ValueError:
+            self._log("[red]Usage: negotiate <n> [pct][/]")
+            return
+        pct = float(args[1]) / 100 if len(args) > 1 else 0.15
+        s = self.app.state
+        if idx < 0 or idx >= len(s.pending_contracts):
+            self._log(f"[red]No offer #{idx+1}[/]")
+            return
+        contract = s.pending_contracts[idx]
+        c_obj = ContractModel(**contract) if isinstance(contract, dict) else contract
+        new_contract = negotiate_contract(c_obj, counter_pct=pct)
+        s.pending_contracts.pop(idx)
+        if new_contract:
+            new_contract.status = "active"
+            s.active_contracts.append(new_contract)
+            from game.save import save_game
+            save_game(self.app.state)
+            self._refresh_pin_panel()
+            if self._open_target == "contracts":
+                self._render_open_panel()
+            self._log(f"[#00ff41]Negotiated! New rate: ${new_contract.monthly_revenue:,.2f}/mo[/]")
+        else:
+            from game.save import save_game
+            save_game(self.app.state)
+            if self._open_target == "contracts":
+                self._render_open_panel()
+            self._log("[red]Counter-offer rejected.[/]")
 
     def _cmd_assign(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        if len(args) < 2:
+            self._log("[red]Usage: assign <server_id> <contract_id>[/]")
+            return
+        server_id_prefix = args[0]
+        contract_id_prefix = args[1]
+        s = self.app.state
+        server = next(
+            (sv for sv in s.servers
+             if (sv.get("id", "") if isinstance(sv, dict) else sv.id).startswith(server_id_prefix)),
+            None
+        )
+        if server is None:
+            self._log(f"[red]No server with ID starting '{server_id_prefix}'[/]")
+            return
+        contract = next(
+            (c for c in s.active_contracts
+             if (c.get("id", "") if isinstance(c, dict) else c.id).startswith(contract_id_prefix)),
+            None
+        )
+        if contract is None:
+            self._log(f"[red]No active contract with ID starting '{contract_id_prefix}'[/]")
+            return
+        srv_id = server.get("id") if isinstance(server, dict) else server.id
+        ctr_id = contract.get("id") if isinstance(contract, dict) else contract.id
+        if isinstance(contract, dict):
+            contract["server_id"] = srv_id
+        else:
+            contract.server_id = srv_id
+        if isinstance(server, dict):
+            server["contract_id"] = ctr_id
+        else:
+            server.contract_id = ctr_id
+        srv_name = server.get("name", srv_id[:8]) if isinstance(server, dict) else getattr(server, "name", srv_id[:8])
+        cname = contract.get("client_name", "?") if isinstance(contract, dict) else contract.client_name
+        from game.save import save_game
+        save_game(self.app.state)
+        self._refresh_pin_panel()
+        if self._open_target == "contracts":
+            self._render_open_panel()
+        self._log(f"[#00ff41]Assigned {srv_name} to {cname}'s contract.[/]")
 
     def _cmd_gig(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        from game.engine import accept_gig
+        if len(args) != 1:
+            self._log("[red]Usage: gig <n>[/]")
+            return
+        try:
+            idx = int(args[0]) - 1
+        except ValueError:
+            self._log("[red]Usage: gig <n>[/]")
+            return
+        try:
+            self.app.state = accept_gig(self.app.state, idx)
+            from game.save import save_game
+            save_game(self.app.state)
+            self._refresh_pin_panel()
+            if self._open_target == "gigs":
+                self._render_open_panel()
+            self._log("[#00ff41]Gig completed! Check event log for payout.[/]")
+        except ValueError as e:
+            self._log(f"[red]{e}[/]")
 
     def _cmd_buyhw(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        from game.datacenter import buy_component
+        if len(args) != 1:
+            self._log("[red]Usage: buyhw <hw_id>  (see hw_id column in store panel)[/]")
+            return
+        try:
+            self.app.state = buy_component(self.app.state, args[0])
+            from game.save import save_game
+            save_game(self.app.state)
+            self._refresh_pin_panel()
+            if self._open_target in ("store", "servers"):
+                self._render_open_panel()
+            self._log(f"[#00ff41]Purchased {args[0]}. Check inventory with: view inventory[/]")
+        except ValueError as e:
+            self._log(f"[red]{e}[/]")
 
     def _cmd_assemble(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        from game.datacenter import assemble_server, _find_hardware
+        if len(args) < 5:
+            self._log("[red]Usage: assemble <name> <cpu_id> <ram_id> <storage_id> <nic_id>  (more ram/storage ok)[/]")
+            return
+        name = args[0]
+        hw_ids = args[1:]
+        cpu_ids, ram_ids, stor_ids, nic_ids = [], [], [], []
+        for hw_id in hw_ids:
+            if hw_id.startswith("cpu_"):
+                cpu_ids.append(hw_id)
+            elif hw_id.startswith("ram_"):
+                ram_ids.append(hw_id)
+            elif hw_id.startswith("hdd_") or hw_id.startswith("ssd_"):
+                stor_ids.append(hw_id)
+            elif hw_id.startswith("nic_"):
+                nic_ids.append(hw_id)
+            else:
+                self._log(f"[red]Unknown component type for '{hw_id}'. IDs must start with cpu_/ram_/hdd_/ssd_/nic_[/]")
+                return
+        if len(cpu_ids) != 1:
+            self._log("[red]Need exactly 1 CPU (cpu_budget / cpu_mid / cpu_pro / cpu_enterprise)[/]")
+            return
+        if not ram_ids:
+            self._log("[red]Need at least 1 RAM stick[/]")
+            return
+        if not stor_ids:
+            self._log("[red]Need at least 1 storage drive[/]")
+            return
+        if len(nic_ids) != 1:
+            self._log("[red]Need exactly 1 NIC (nic_1g / nic_10g)[/]")
+            return
+        s = self.app.state
+        used: set = set()
+        def claim(hw_id):
+            hw = _find_hardware(hw_id)
+            for c in s.hardware_inventory:
+                c_name = c.get("name") if isinstance(c, dict) else c.name
+                c_id = c.get("id") if isinstance(c, dict) else c.id
+                if c_name == hw["name"] and c_id not in used:
+                    used.add(c_id)
+                    return c_id
+            return None
+        cpu_inst = claim(cpu_ids[0])
+        ram_insts = [claim(r) for r in ram_ids]
+        stor_insts = [claim(r) for r in stor_ids]
+        nic_inst = claim(nic_ids[0])
+        missing = []
+        if cpu_inst is None:
+            missing.append(cpu_ids[0])
+        for i, r in enumerate(ram_insts):
+            if r is None:
+                missing.append(ram_ids[i])
+        for i, r in enumerate(stor_insts):
+            if r is None:
+                missing.append(stor_ids[i])
+        if nic_inst is None:
+            missing.append(nic_ids[0])
+        if missing:
+            self._log(f"[red]Not in inventory: {', '.join(missing)}[/]")
+            return
+        try:
+            self.app.state, server = assemble_server(s, name, cpu_inst, ram_insts, stor_insts, nic_inst)
+            cores = server.total_cores if hasattr(server, "total_cores") else server.get("total_cores", 0)
+            ram = server.total_ram_gb if hasattr(server, "total_ram_gb") else server.get("total_ram_gb", 0)
+            stor = server.total_storage_gb if hasattr(server, "total_storage_gb") else server.get("total_storage_gb", 0)
+            from game.save import save_game
+            save_game(self.app.state)
+            self._refresh_pin_panel()
+            if self._open_target in ("store", "servers"):
+                self._render_open_panel()
+            self._log(f"[#00ff41]Built '{name}': {cores} cores / {ram}GB RAM / {stor}GB storage. Install with: install <server_id> <rack_id>[/]")
+        except ValueError as e:
+            self._log(f"[red]{e}[/]")
 
     def _cmd_install(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        from game.datacenter import install_server_in_rack
+        if len(args) < 2:
+            self._log("[red]Usage: install <server_id> <rack_id>[/]")
+            return
+        server_id_prefix = args[0]
+        rack_id_prefix = args[1]
+        s = self.app.state
+        server = next(
+            (sv for sv in s.servers
+             if (sv.get("id", "") if isinstance(sv, dict) else sv.id).startswith(server_id_prefix)),
+            None
+        )
+        if server is None:
+            self._log(f"[red]No server with ID starting '{server_id_prefix}'[/]")
+            return
+        rack = next(
+            (r for r in s.racks
+             if (r.get("id", "") if isinstance(r, dict) else r.id).startswith(rack_id_prefix)),
+            None
+        )
+        if rack is None:
+            self._log(f"[red]No rack with ID starting '{rack_id_prefix}'[/]")
+            return
+        server_name = server.get("name", server_id_prefix) if isinstance(server, dict) else getattr(server, "name", server_id_prefix)
+        rack_name = rack.get("name", rack_id_prefix) if isinstance(rack, dict) else getattr(rack, "name", rack_id_prefix)
+        rack_idx = s.racks.index(rack)
+        try:
+            self.app.state = install_server_in_rack(self.app.state, server_name, rack_idx)
+            from game.save import save_game
+            save_game(self.app.state)
+            self._refresh_pin_panel()
+            if self._open_target in ("servers", "racks"):
+                self._render_open_panel()
+            self._log(f"[#00ff41]Installed '{server_name}' in {rack_name}.[/]")
+        except ValueError as e:
+            self._log(f"[red]{e}[/]")
 
     def _cmd_repair(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        from game.datacenter import repair_server
+        if not args:
+            self._log("[red]Usage: repair <server_id>[/]")
+            return
+        server_id_prefix = args[0]
+        s = self.app.state
+        server = next(
+            (sv for sv in s.servers
+             if (sv.get("id", "") if isinstance(sv, dict) else sv.id).startswith(server_id_prefix)),
+            None
+        )
+        if server is None:
+            self._log(f"[red]No server with ID starting '{server_id_prefix}'[/]")
+            return
+        server_name = server.get("name", server_id_prefix) if isinstance(server, dict) else getattr(server, "name", server_id_prefix)
+        try:
+            self.app.state = repair_server(self.app.state, server_name)
+            from game.save import save_game
+            save_game(self.app.state)
+            self._refresh_pin_panel()
+            if self._open_target in ("servers", "racks"):
+                self._render_open_panel()
+            self._log(f"[#00ff41]Repaired '{server_name}' to 100% health. (-$500)[/]")
+        except ValueError as e:
+            self._log(f"[red]{e}[/]")
 
     def _cmd_rent(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        from game.datacenter import rent_rack
+        try:
+            self.app.state = rent_rack(self.app.state)
+            rack = self.app.state.racks[-1]
+            rent = rack.monthly_rent if hasattr(rack, "monthly_rent") else rack.get("monthly_rent", 800)
+            from game.save import save_game
+            save_game(self.app.state)
+            self._refresh_pin_panel()
+            if self._open_target == "racks":
+                self._render_open_panel()
+            self._log(f"[#00ff41]Rented a new rack (${rent:,.0f}/mo). You now have {len(self.app.state.racks)} racks.[/]")
+        except ValueError as e:
+            self._log(f"[red]{e}[/]")
