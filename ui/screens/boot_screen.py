@@ -4,6 +4,14 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import RichLog, Input, Static
 from textual.containers import Horizontal
+from game.save import _DEFAULT_SAVES_DIR
+
+
+def _attr(obj, key, default=0):
+    """Get an attribute from either a dataclass instance or a plain dict (after JSON load)."""
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
 
 BOOT_LINES = [
     "DATACENTER OS v1.0.0",
@@ -38,9 +46,9 @@ class BootScreen(Screen):
             log.write(line)
             await asyncio.sleep(0.06)
 
-        # Check for save files
+        # Check for save files (use absolute path so CWD doesn't matter)
         saves = sorted(
-            Path("saves").glob("*.json"),
+            _DEFAULT_SAVES_DIR.glob("*.json"),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )
@@ -63,17 +71,23 @@ class BootScreen(Screen):
 
     async def _returning_player(self, company_name: str) -> None:
         from game.save import load_game
-        state = load_game(company_name)
+        log = self.query_one("#boot-log", RichLog)
+        try:
+            state = load_game(company_name)
+        except Exception as e:
+            log.write(f"[red]Save file could not be loaded: {e}[/]")
+            log.write("[yellow]Starting new game...[/]")
+            await self._new_player()
+            return
         if state is None:
             await self._new_player()
             return
         self.app.state = state
-        log = self.query_one("#boot-log", RichLog)
         log.write("")
 
-        monthly_revenue = sum(c.monthly_revenue for c in state.active_contracts)
-        monthly_rent = sum(r.monthly_rent for r in state.racks)
-        monthly_loans = sum(l.monthly_payment for l in state.loans)
+        monthly_revenue = sum(_attr(c, "monthly_revenue") for c in state.active_contracts)
+        monthly_rent = sum(_attr(r, "monthly_rent") for r in state.racks)
+        monthly_loans = sum(_attr(l, "monthly_payment") for l in state.loans)
         net_monthly = monthly_revenue - monthly_rent - monthly_loans
         net_color = "green" if net_monthly >= 0 else "red"
         net_sign = "+" if net_monthly >= 0 else ""
