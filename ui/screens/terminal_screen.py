@@ -835,10 +835,10 @@ class TerminalScreen(Screen):
             self._log(f"[red]No bond with ID starting '{prefix}'[/]")
             return
         bond = s.bonds[idx]
-        fv = bond["face_value"] if isinstance(bond, dict) else bond.face_value
-        yld = bond["annual_yield"] if isinstance(bond, dict) else bond.annual_yield
-        days_rem = bond["days_remaining"] if isinstance(bond, dict) else bond.days_remaining
-        mat_days = bond["maturity_days"] if isinstance(bond, dict) else bond.maturity_days
+        fv = self._ga(bond, "face_value")
+        yld = self._ga(bond, "annual_yield")
+        days_rem = self._ga(bond, "days_remaining")
+        mat_days = self._ga(bond, "maturity_days")
         value = bond_current_value(fv, yld, days_rem, mat_days)
         s.cash += value
         s.bonds.pop(idx)
@@ -910,10 +910,10 @@ class TerminalScreen(Screen):
             return
         try:
             idx = int(args[0]) - 1
+            pct = float(args[1]) / 100 if len(args) > 1 else 0.15
         except ValueError:
             self._log("[red]Usage: negotiate <n> [pct][/]")
             return
-        pct = float(args[1]) / 100 if len(args) > 1 else 0.15
         s = self.app.state
         if idx < 0 or idx >= len(s.pending_contracts):
             self._log(f"[red]No offer #{idx+1}[/]")
@@ -1061,10 +1061,14 @@ class TerminalScreen(Screen):
                     used.add(c_id)
                     return c_id
             return None
-        cpu_inst = claim(cpu_ids[0])
-        ram_insts = [claim(r) for r in ram_ids]
-        stor_insts = [claim(r) for r in stor_ids]
-        nic_inst = claim(nic_ids[0])
+        try:
+            cpu_inst = claim(cpu_ids[0])
+            ram_insts = [claim(r) for r in ram_ids]
+            stor_insts = [claim(r) for r in stor_ids]
+            nic_inst = claim(nic_ids[0])
+        except ValueError as e:
+            self._log(f"[red]{e}[/]")
+            return
         missing = []
         if cpu_inst is None:
             missing.append(cpu_ids[0])
