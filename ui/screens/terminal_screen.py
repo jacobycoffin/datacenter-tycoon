@@ -12,6 +12,8 @@ class TerminalScreen(Screen):
     def __init__(self) -> None:
         super().__init__()
         self._prompt_text: str = "[user@datacenter ~]$ "
+        self._pinned_metrics: dict[str, bool] = {}   # metric name → True (just a set of names)
+        self._open_target: str | None = None         # current open panel target, or None
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="top-area"):
@@ -40,10 +42,55 @@ class TerminalScreen(Screen):
         self.query_one("#terminal", RichLog).write(text)
 
     def _refresh_pin_panel(self) -> None:
-        pass  # implemented in Task 4
+        if not self._pinned_metrics:
+            return
+        s = self.app.state
+        if not s:
+            return
+        lines = []
+        if "cash" in self._pinned_metrics:
+            lines.append(f"Cash  [#00ff41]${s.cash:,.0f}[/]")
+        if "day" in self._pinned_metrics:
+            lines.append(f"Day   [#00ff41]{s.day}[/]")
+        if "income" in self._pinned_metrics:
+            income = sum(c.monthly_revenue if not isinstance(c, dict) else c.get("monthly_revenue", 0)
+                         for c in s.active_contracts)
+            lines.append(f"Inc   [#00ff41]+${income:,.0f}/mo[/]")
+        if "rep" in self._pinned_metrics:
+            lines.append(f"Rep   [#00ff41]{s.reputation}[/]")
+        if "credit" in self._pinned_metrics:
+            lines.append(f"Cred  [#00ff41]{s.credit_score}[/]")
+        if "net" in self._pinned_metrics:
+            income = sum(c.monthly_revenue if not isinstance(c, dict) else c.get("monthly_revenue", 0)
+                         for c in s.active_contracts)
+            rent = sum(r.monthly_rent if not isinstance(r, dict) else r.get("monthly_rent", 0)
+                       for r in s.racks)
+            loans = sum(l.monthly_payment if not isinstance(l, dict) else l.get("monthly_payment", 0)
+                        for l in s.loans)
+            net = income - rent - loans
+            color = "green" if net >= 0 else "red"
+            sign = "+" if net >= 0 else ""
+            lines.append(f"Net   [{color}]{sign}${net:,.0f}/mo[/]")
+        self.query_one("#pin-panel", Static).update("\n".join(lines))
 
     def _update_visibility(self) -> None:
-        pass  # implemented in Task 4
+        top_area = self.query_one("#top-area", Horizontal)
+        pin_panel = self.query_one("#pin-panel", Static)
+
+        has_pin = bool(self._pinned_metrics)
+        has_open = self._open_target is not None
+
+        # Show/hide top-area
+        if has_pin or has_open:
+            top_area.add_class("visible")
+        else:
+            top_area.remove_class("visible")
+
+        # Show/hide pin-panel
+        if has_pin:
+            pin_panel.add_class("visible")
+        else:
+            pin_panel.remove_class("visible")
 
     # ------------------------------------------------------------------ #
     # Input handling
@@ -163,16 +210,67 @@ class TerminalScreen(Screen):
         self._log("[dim]Command registered — full implementation in next task.[/]")
 
     def _cmd_pin(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        valid = {"cash", "day", "income", "rep", "credit", "net"}
+        if not args:
+            self._log("[red]Usage: pin <metric>  or  pin clear[/]")
+            self._log(f"  Valid metrics: {', '.join(sorted(valid))}")
+            return
+        if args[0].lower() == "clear":
+            self._pinned_metrics.clear()
+            self._update_visibility()
+            self._log("Pin panel cleared.")
+            return
+        metric = args[0].lower()
+        if metric not in valid:
+            self._log(f"[red]Unknown metric '{metric}'. Valid: {', '.join(sorted(valid))}[/]")
+            return
+        self._pinned_metrics[metric] = True
+        self._update_visibility()
+        self._refresh_pin_panel()
+        self._log(f"Pinned [#9d4edd]{metric}[/].")
 
     def _cmd_unpin(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        if not args:
+            self._log("[red]Usage: unpin <metric>[/]")
+            return
+        metric = args[0].lower()
+        if metric not in self._pinned_metrics:
+            self._log(f"[yellow]{metric} is not pinned.[/]")
+            return
+        del self._pinned_metrics[metric]
+        self._update_visibility()
+        self._refresh_pin_panel()
+        self._log(f"Unpinned {metric}.")
 
     def _cmd_open(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        valid = {"store", "contracts", "market", "servers", "racks", "gigs", "banking"}
+        if not args:
+            self._log(f"[red]Usage: open <target>  Valid: {', '.join(sorted(valid))}[/]")
+            return
+        target = args[0].lower()
+        if target not in valid:
+            self._log(f"[red]Unknown target '{target}'. Valid: {', '.join(sorted(valid))}[/]")
+            return
+        self._open_target = target
+        self._update_visibility()
+        self._render_open_panel()  # stub until Task 6
+        self._log(f"Opened [#9d4edd]{target}[/]. Type 'close' to dismiss.")
 
     def _cmd_close(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        if self._open_target is None:
+            self._log("[yellow]No panel is open.[/]")
+            return
+        old = self._open_target
+        self._open_target = None
+        self.query_one("#open-panel", Static).update("")
+        self._update_visibility()
+        self._log(f"Closed {old} panel.")
+
+    def _render_open_panel(self) -> None:
+        """Renders content into #open-panel. Full implementation in Task 6."""
+        self.query_one("#open-panel", Static).update(
+            f"[#9d4edd]── {self._open_target.upper()} ──[/]\n[dim]Panel content coming in Task 6[/]"
+        )
 
     def _cmd_buy(self, args: list[str]) -> None:
         self._log("[dim]Command registered — full implementation in next task.[/]")
