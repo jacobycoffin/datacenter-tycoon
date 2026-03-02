@@ -9,18 +9,22 @@ from textual.containers import Horizontal
 class TerminalScreen(Screen):
     """Hacker-terminal style main game screen."""
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._prompt_text: str = "[user@datacenter ~]$ "
+
     def compose(self) -> ComposeResult:
         with Horizontal(id="top-area"):
             yield Static("", id="pin-panel")
             yield Static("", id="open-panel")
         yield RichLog(id="terminal", markup=True, highlight=False, max_lines=500)
         with Horizontal(id="input-row"):
-            yield Static(self._prompt_str(), id="prompt-label")
+            yield Static(self._prompt_text, id="prompt-label")
             yield Input(id="cmd-input", placeholder="")
 
     def on_mount(self) -> None:
-        prompt = self.query_one("#prompt-label", Static)
-        prompt.update(self._prompt_str())
+        self._prompt_text = self._prompt_str()
+        self.query_one("#prompt-label", Static).update(self._prompt_text)
         self._log("Type [bold]'help'[/] to see available commands.")
         self.query_one("#cmd-input", Input).focus()
 
@@ -51,8 +55,7 @@ class TerminalScreen(Screen):
         inp.clear()
         if not raw:
             return
-        prompt = self.query_one("#prompt-label", Static).renderable
-        self._log(f"[bold #00ff41]{prompt}[/] {raw}")
+        self._log(f"[bold #00ff41]{self._prompt_text}[/] {raw}")
         self._run_command(raw)
         inp.focus()
 
@@ -129,6 +132,9 @@ class TerminalScreen(Screen):
     def _cmd_day(self, args: list[str]) -> None:
         from game.engine import advance_day
         from game.save import save_game
+        if not self.app.state:
+            self._log("[red]No active game session.[/]")
+            return
         state = advance_day(self.app.state)
         self.app.state = state
         save_game(state)
@@ -136,9 +142,16 @@ class TerminalScreen(Screen):
         for entry in state.event_log[-3:]:
             self._log(f"  [#3a7a3a]{entry}[/]")
         self._refresh_pin_panel()
+        if state.cash == -1.0:
+            self._log("[bold red]GAME OVER — BANKRUPTCY. Your company has collapsed.[/]")
+            self._log("[dim]Save file preserved. Start a new game to try again.[/]")
+            self.query_one("#cmd-input", Input).disabled = True
 
     def _cmd_save(self, args: list[str]) -> None:
         from game.save import save_game
+        if not self.app.state:
+            self._log("[red]No active game session.[/]")
+            return
         save_game(self.app.state)
         self._log("Game saved.")
 
