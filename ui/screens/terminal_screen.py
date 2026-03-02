@@ -208,7 +208,187 @@ class TerminalScreen(Screen):
     # ------------------------------------------------------------------ #
 
     def _cmd_view(self, args: list[str]) -> None:
-        self._log("[dim]Command registered — full implementation in next task.[/]")
+        targets = {
+            "cash": self._view_cash,
+            "contracts": self._view_contracts,
+            "servers": self._view_servers,
+            "market": self._view_market,
+            "loans": self._view_loans,
+            "bonds": self._view_bonds,
+            "inventory": self._view_inventory,
+            "racks": self._view_racks,
+            "gigs": self._view_gigs,
+            "all": self._view_all,
+        }
+        if not args:
+            self._log(f"[red]Usage: view <target>  Valid: {', '.join(sorted(targets))}[/]")
+            return
+        target = args[0].lower()
+        fn = targets.get(target)
+        if fn:
+            fn()
+        else:
+            self._log(f"[red]Unknown view target '{target}'. Valid: {', '.join(sorted(targets))}[/]")
+
+    def _view_cash(self) -> None:
+        s = self.app.state
+        self._log(f"[#9d4edd]── CASH ──[/]")
+        self._log(f"  Checking:  [#00ff41]${s.cash:>12,.2f}[/]")
+        self._log(f"  Savings:   [#00ff41]${s.savings:>12,.2f}[/]")
+        self._log(f"  Total:     [#00ff41]${s.cash + s.savings:>12,.2f}[/]")
+
+    def _view_contracts(self) -> None:
+        s = self.app.state
+        self._log("[#9d4edd]── CONTRACTS ──[/]")
+        if not s.active_contracts and not s.pending_contracts:
+            self._log("  [dim]No contracts.[/]")
+            return
+        if s.active_contracts:
+            self._log("  [bold]Active:[/]")
+            for i, c in enumerate(s.active_contracts):
+                name = self._ga(c, "client_name", "?")
+                rev = self._ga(c, "monthly_revenue", 0)
+                days = self._ga(c, "days_remaining", 0)
+                sla = self._ga(c, "sla_tier", "?")
+                self._log(f"  {i+1}. {name}  ${rev:,.2f}/mo  {days}d left  SLA {sla}%")
+        if s.pending_contracts:
+            self._log("  [bold]Pending offers:[/]")
+            for i, c in enumerate(s.pending_contracts):
+                name = self._ga(c, "client_name", "?")
+                rev = self._ga(c, "monthly_revenue", 0)
+                cores = self._ga(c, "required_cores", 0)
+                ram = self._ga(c, "required_ram_gb", 0)
+                sla = self._ga(c, "sla_tier", "?")
+                self._log(f"  {i+1}. {name}  ${rev:,.2f}/mo  {cores}c/{ram}GB  SLA {sla}%")
+
+    def _view_servers(self) -> None:
+        s = self.app.state
+        self._log("[#9d4edd]── SERVERS ──[/]")
+        if not s.servers:
+            self._log("  [dim]No servers assembled.[/]")
+            return
+        for srv in s.servers:
+            name = self._ga(srv, "name", "?")
+            srv_id = self._ga(srv, "id", "?")[:8]
+            cores = self._ga(srv, "total_cores", 0)
+            ram = self._ga(srv, "total_ram_gb", 0)
+            storage = self._ga(srv, "total_storage_gb", 0)
+            health = self._ga(srv, "health", 1.0)
+            rack_id = self._ga(srv, "rack_id", None)
+            health_color = "green" if health > 0.7 else ("yellow" if health > 0.3 else "red")
+            rack_str = f"rack:{rack_id[:6]}" if rack_id else "[dim]uninstalled[/]"
+            self._log(f"  {name} [dim]({srv_id})[/]  {cores}c/{ram}GB/{storage}GB  [{health_color}]health:{health:.0%}[/]  {rack_str}")
+
+    def _view_market(self) -> None:
+        s = self.app.state
+        self._log("[#9d4edd]── MARKET ──[/]")
+        for ticker, price in sorted(s.market_prices.items()):
+            hist = s.price_history.get(ticker, [price])
+            prev = hist[-2] if len(hist) >= 2 else price
+            chg = price - prev
+            chg_pct = (chg / prev * 100) if prev else 0
+            color = "green" if chg >= 0 else "red"
+            owned = s.portfolio.get(ticker, {}).get("shares", 0)
+            owned_str = f"  own:{owned}" if owned else ""
+            self._log(f"  {ticker:<6} [#00ff41]${price:>8.2f}[/]  [{color}]{chg_pct:+.2f}%[/]{owned_str}")
+
+    def _view_loans(self) -> None:
+        s = self.app.state
+        self._log("[#9d4edd]── LOANS ──[/]")
+        if not s.loans:
+            self._log("  [dim]No active loans.[/]")
+            return
+        for loan in s.loans:
+            balance = self._ga(loan, "remaining_balance", 0)
+            payment = self._ga(loan, "monthly_payment", 0)
+            days = self._ga(loan, "days_remaining", 0)
+            rate = self._ga(loan, "annual_rate", 0)
+            self._log(f"  ${balance:,.2f} remaining  {rate*100:.1f}% APR  ${payment:,.2f}/mo  {days}d left")
+
+    def _view_bonds(self) -> None:
+        s = self.app.state
+        self._log("[#9d4edd]── BONDS ──[/]")
+        if not s.bonds:
+            self._log("  [dim]No bonds held.[/]")
+            return
+        for bond in s.bonds:
+            fv = self._ga(bond, "face_value", 0)
+            yld = self._ga(bond, "annual_yield", 0)
+            days = self._ga(bond, "days_remaining", 0)
+            bid = self._ga(bond, "id", "?")[:8]
+            self._log(f"  [dim]({bid})[/]  ${fv:,.2f} face  {yld*100:.0f}%/yr  {days}d to maturity")
+
+    def _view_inventory(self) -> None:
+        s = self.app.state
+        self._log("[#9d4edd]── HARDWARE INVENTORY ──[/]")
+        if not s.hardware_inventory:
+            self._log("  [dim]No components in inventory.[/]")
+            return
+        for comp in s.hardware_inventory:
+            ctype = self._ga(comp, "type", "?").upper()
+            cname = self._ga(comp, "name", "?")
+            price = self._ga(comp, "price", 0)
+            cid = self._ga(comp, "id", "?")[:8]
+            self._log(f"  [{ctype}] {cname}  ${price:,.2f}  [dim]id:{cid}[/]")
+
+    def _view_racks(self) -> None:
+        s = self.app.state
+        self._log("[#9d4edd]── RACKS ──[/]")
+        if not s.racks:
+            self._log("  [dim]No racks rented.[/]")
+            return
+        for rack in s.racks:
+            rid = self._ga(rack, "id", "?")[:8]
+            rname = self._ga(rack, "name", "?")
+            tier = self._ga(rack, "location_tier", "?")
+            rent = self._ga(rack, "monthly_rent", 0)
+            total_u = self._ga(rack, "total_u", 12)
+            installed = [srv for srv in s.servers if self._ga(srv, "rack_id", None) == self._ga(rack, "id", None)]
+            used_u = sum(self._ga(srv, "size_u", 1) for srv in installed)
+            self._log(f"  {rname} [dim]({rid})[/]  {tier}  {used_u}/{total_u}U  ${rent:,.0f}/mo")
+
+    def _view_gigs(self) -> None:
+        s = self.app.state
+        self._log("[#9d4edd]── GIG BOARD ──[/]")
+        if not s.available_gigs:
+            self._log("  [dim]No gigs available today.[/]")
+            return
+        for i, gig in enumerate(s.available_gigs):
+            title = self._ga(gig, "title", "?")
+            payout = self._ga(gig, "payout", 0)
+            gid = self._ga(gig, "id", "?")[:6]
+            self._log(f"  {i+1}. [#ffb703]${payout:,.2f}[/]  {title}  [dim](id:{gid})[/]")
+
+    def _view_all(self) -> None:
+        s = self.app.state
+        monthly_revenue = sum(self._ga(c, "monthly_revenue") for c in s.active_contracts)
+        monthly_rent = sum(self._ga(r, "monthly_rent") for r in s.racks)
+        monthly_loans = sum(self._ga(l, "monthly_payment") for l in s.loans)
+        net = monthly_revenue - monthly_rent - monthly_loans
+        net_color = "green" if net >= 0 else "red"
+        net_sign = "+" if net >= 0 else ""
+        from game.market import portfolio_value
+        port_val = portfolio_value(s.portfolio, s.market_prices)
+        bond_val = sum(self._ga(b, "face_value") for b in s.bonds)
+        loan_debt = sum(self._ga(l, "remaining_balance") for l in s.loans)
+        net_worth = s.cash + s.savings + port_val + bond_val - loan_debt
+
+        self._log(f"[#9d4edd]── FINANCIAL SUMMARY  Day {s.day} ──[/]")
+        self._log(f"  Net Worth:       [#ffb703]${net_worth:>12,.2f}[/]")
+        self._log(f"  Cash (checking): [#00ff41]${s.cash:>12,.2f}[/]")
+        self._log(f"  Savings:         [#00ff41]${s.savings:>12,.2f}[/]")
+        self._log(f"  Investments:     [#ffb703]${port_val + bond_val:>12,.2f}[/]")
+        self._log(f"  Total Debt:      [red]${loan_debt:>12,.2f}[/]")
+        self._log("")
+        self._log(f"  Monthly Revenue: [#00ff41]${monthly_revenue:>10,.2f}[/]")
+        self._log(f"  Monthly Costs:   [red]${monthly_rent + monthly_loans:>10,.2f}[/]")
+        self._log(f"  Monthly Net:     [{net_color}]{net_sign}${abs(net):>10,.2f}[/]")
+        self._log("")
+        self._log(f"  Active Contracts: {len(s.active_contracts)}")
+        self._log(f"  Servers Online:   {sum(1 for srv in s.servers if self._ga(srv, 'rack_id', None))}")
+        self._log(f"  Racks Rented:     {len(s.racks)}")
+        self._log(f"  Reputation:       {s.reputation}/100")
+        self._log(f"  Credit Score:     {s.credit_score}")
 
     def _cmd_pin(self, args: list[str]) -> None:
         valid = {"cash", "day", "income", "rep", "credit", "net"}
