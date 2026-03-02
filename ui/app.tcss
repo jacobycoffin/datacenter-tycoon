@@ -1,34 +1,98 @@
+/* ── Global ─────────────────────────────────────────────── */
 Screen {
-    background: #0d1117;
-    color: #c9d1d9;
+    background: #0a0a0a;
+    color: #00ff41;
+    layout: vertical;
 }
 
-Header {
-    background: #161b22;
-    color: #58a6ff;
-    text-style: bold;
+/* ── Boot screen ─────────────────────────────────────────── */
+#boot-log {
+    background: #0a0a0a;
+    color: #00ff41;
+    height: 1fr;
 }
 
-Footer {
-    background: #161b22;
-    color: #8b949e;
+#boot-input-row {
+    height: 3;
+    background: #0a0a0a;
 }
 
-.panel {
-    border: solid #30363d;
-    padding: 1 2;
-    margin: 0 1;
+#boot-prompt {
+    width: auto;
+    color: #00ff41;
+    background: #0a0a0a;
+    padding: 0 0 0 1;
 }
 
-.money-positive { color: #3fb950; }
-.money-negative { color: #f85149; }
-.money-neutral  { color: #c9d1d9; }
+#boot-input {
+    background: #0a0a0a;
+    color: #00ff41;
+    border: none;
+    height: 1;
+}
 
-.sla-green  { color: #3fb950; }
-.sla-yellow { color: #e3b341; }
-.sla-red    { color: #f85149; }
+#boot-input:focus {
+    border: none;
+}
 
-.panel-title {
-    color: #58a6ff;
-    text-style: bold;
+/* ── Terminal screen ─────────────────────────────────────── */
+#top-area {
+    height: 2fr;
+    display: none;
+}
+
+#top-area.visible {
+    display: block;
+}
+
+#pin-panel {
+    width: 26;
+    border-right: tall #9d4edd;
+    background: #0a0a0a;
+    color: #00ff41;
+    padding: 0 1;
+    display: none;
+}
+
+#pin-panel.visible {
+    display: block;
+}
+
+#open-panel {
+    background: #0a0a0a;
+    color: #00ff41;
+    padding: 0 1;
+    height: 1fr;
+}
+
+#terminal {
+    background: #0a0a0a;
+    color: #00ff41;
+    height: 1fr;
+    scrollbar-color: #3a7a3a;
+    scrollbar-background: #0a0a0a;
+}
+
+#input-row {
+    height: 3;
+    background: #0a0a0a;
+}
+
+#prompt-label {
+    width: auto;
+    color: #00ff41;
+    background: #0a0a0a;
+    padding: 0 0 0 1;
+    content-align: left middle;
+}
+
+#cmd-input {
+    background: #0a0a0a;
+    color: #00ff41;
+    border: none;
+    height: 1;
+}
+
+#cmd-input:focus {
+    border: none;
 }
