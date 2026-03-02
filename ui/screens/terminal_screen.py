@@ -53,6 +53,7 @@ class TerminalScreen(Screen):
         if not s:
             return
         lines = []
+        income = 0  # computed lazily below; initialized here to prevent UnboundLocalError on refactor
         if "cash" in self._pinned_metrics:
             lines.append(f"Cash  [#00ff41]${s.cash:,.0f}[/]")
         if "day" in self._pinned_metrics:
@@ -469,10 +470,7 @@ class TerminalScreen(Screen):
             )
 
     def _panel_store(self) -> str:
-        import json
-        from pathlib import Path
-        hw_path = Path(__file__).resolve().parent.parent.parent / "data" / "hardware.json"
-        hw = json.loads(hw_path.read_text())
+        from game.datacenter import HARDWARE as hw
         lines = ["[#9d4edd]── HARDWARE STORE ──[/]",
                  "[dim]Use: buyhw <id>[/]", ""]
         for category, items in hw.items():
